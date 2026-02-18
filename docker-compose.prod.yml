@@ -1,0 +1,265 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: sovereign_ai_postgres
+    environment:
+      POSTGRES_DB: sovereign_ai arsenal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: sovereign_ai_redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sovereign_ai_backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/sovereign_ai arsenal
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - LOG_LEVEL=INFO
+      - CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
+      - SECURITY_REQUIRE_HTTPS=true
+      - RATE_LIMIT_REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sovereign_ai_frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: sovereign_ai_nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend:
+        condition: service_healthy
+      - frontend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+
+  # Vector Database (ChromaDB)
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: sovereign_ai_chromadb
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8001
+      - CHROMA_SERVER_AUTH_CREDENTIALS_ENABLED=false
+      - ALLOW_RESET=TRUE
+    volumes:
+      - chromadb_data:/chroma/chroma
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sovereign_ai_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+      - ./monitoring/rules:/etc/prometheus/rules
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sovereign_ai_grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+
+  # Monitoring - Redis Exporter
+  redis_exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: sovereign_ai_redis_exporter
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+
+  # Monitoring - Node Exporter
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: sovereign_ai_node_exporter
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - sovereign_ai_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  chromadb_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  sovereign_ai_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Production override
+x-production:
+  services:
+    backend:
+      environment:
+        - LOG_LEVEL=WARNING
+        - SECURITY_REQUIRE_HTTPS=true
+        - CORS_ORIGINS=https://yourdomain.com
+    nginx:
+      volumes:
+        - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf
+        - ./nginx/ssl:/etc/nginx/ssl
+    postgres:
+      environment:
+        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+        - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+    redis:
+      command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 512mb --maxmemory-policy allkeys-lru
+
+# Development override
+x-development:
+  services:
+    backend:
+      volumes:
+        - ./backend:/app
+      environment:
+        - LOG_LEVEL=DEBUG
+        - SECURITY_REQUIRE_HTTPS=false
+        - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    postgres:
+      environment:
+        - POSTGRES_PASSWORD=postgres
+        - POSTGRES_HOST_AUTH_METHOD=trust
+    redis:
+      command: redis-server --appendonly yes
+    frontend:
+      volumes:
+        - ./frontend:/app
+      environment:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+    chromadb:
+      ports:
+        - "8001:8001"

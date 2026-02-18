@@ -1,0 +1,70 @@
+app_name: "Sovereign AI Arsenal"
+version: "1.0.0"
+description: "Production-grade AI intelligence platform for discovering and analyzing AI repositories"
+
+database:
+  host: ${DB_HOST:localhost}
+  port: ${DB_PORT:5432}
+  name: ${DB_NAME:sovereign_ai_arsenal}
+  user: ${DB_USER:postgres}
+  password: ${DB_PASSWORD:password}
+  pool_size: 10
+  max_overflow: 20
+
+github:
+  api_url: "https://api.github.com"
+  token: ${GITHUB_TOKEN}
+  rate_limit:
+    requests_per_hour: 5000
+    retry_after: 60
+
+ai_models:
+  embedding_model: "text-embedding-3-small"
+  llm_model: "gpt-4"
+  max_tokens: 4000
+  temperature: 0.1
+
+scoring:
+  weights:
+    stars: 0.3
+    forks: 0.2
+    contributors: 0.2
+    commit_frequency: 0.15
+    trend_growth: 0.15
+  thresholds:
+    minimum_stars: 30
+    trending_growth_rate: 0.1
+    active_contributors: 3
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/app.log"
+  max_size: "10MB"
+  backup_count: 5
+
+redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:}
+  db: 0
+
+vector_store:
+  provider: "chromadb"
+  collection_name: "ai_repositories"
+  embedding_dimension: 1536
+  persist_directory: "data/vectors"
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  cors_origins: ["*"]
+  rate_limiting:
+    requests_per_minute: 100
+    burst_size: 20
+
+monitoring:
+  enable_metrics: true
+  metrics_port: 9090
+  health_check_interval: 30
