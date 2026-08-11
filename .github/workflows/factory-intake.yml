@@ -32,7 +32,7 @@ jobs:
       - name: Compile factory
         run: python -m compileall -q factory
       - name: Run self-test
-        run: python factory/selftest.py
+        run: python -m factory.selftest
 
   intake:
     if: ${{ github.event_name == 'workflow_dispatch' }}
