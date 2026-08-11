@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "policy": {
+    "default": "smart",
+    "cooldown_seconds": 15,
+    "max_attempts": 4,
+    "rules": [
+      "Prefer providers with required capabilities.",
+      "Prefer healthier providers using observed success rate and latency.",
+      "Do not retry a provider during cooldown after a failure.",
+      "Keep credentials outside the repository.",
+      "Allow an operator to override routing for deterministic builds."
+    ]
+  },
+  "providers": [
+    {
+      "id": "github-models",
+      "kind": "openai-compatible",
+      "endpoint": "https://models.github.ai/inference",
+      "api_key_env": "GITHUB_MODELS_TOKEN",
+      "requires_api_key": true,
+      "capabilities": ["chat", "model-catalog"],
+      "priority": 20,
+      "notes": "GitHub-hosted model inference; use a token with Models access."
+    },
+    {
+      "id": "openai",
+      "kind": "openai-compatible",
+      "endpoint": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "requires_api_key": true,
+      "capabilities": ["chat", "tool-calling", "structured-output"],
+      "priority": 10
+    },
+    {
+      "id": "ollama",
+      "kind": "openai-compatible",
+      "endpoint": "http://127.0.0.1:11434/v1",
+      "api_key_env": null,
+      "requires_api_key": false,
+      "capabilities": ["chat", "local"],
+      "priority": 40,
+      "notes": "Local fallback; only selected when reachable from the runner."
+    },
+    {
+      "id": "vllm",
+      "kind": "openai-compatible",
+      "endpoint": "http://127.0.0.1:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "requires_api_key": false,
+      "capabilities": ["chat", "local", "gpu"],
+      "priority": 30,
+      "notes": "Self-hosted GPU inference endpoint."
+    },
+    {
+      "id": "litellm-gateway",
+      "kind": "openai-compatible",
+      "endpoint": "http://127.0.0.1:4000",
+      "api_key_env": "LITELLM_API_KEY",
+      "requires_api_key": false,
+      "capabilities": ["chat", "routing", "fallback", "observability"],
+      "priority": 25,
+      "notes": "Optional OSS gateway. It can itself route across many upstream providers."
+    }
+  ]
+}
