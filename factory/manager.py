@@ -19,7 +19,7 @@ SIGNALS: dict[str, tuple[str, ...]] = {
     "node": ("package.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock"),
     "docker": ("Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml"),
     "github_actions": (".github/workflows/",),
-    "database": ("supabase/", "prisma/", "drizzle/", "alembic/", "migrations/", "schema.prisma"),
+    "database": ("supabase", "prisma", "drizzle", "alembic", "migrations/", "schema.prisma"),
     "ai": ("openai", "anthropic", "gemini", "transformers", "langchain", "llamaindex", "ollama"),
     "agents": ("agent", "autogen", "crewai", "langgraph", "mcp", "a2a"),
     "automation": ("n8n", "activepieces", "workflow", "airbyte"),
