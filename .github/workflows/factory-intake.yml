@@ -6,6 +6,7 @@ on:
     paths:
       - "factory/**"
       - ".github/workflows/factory-intake.yml"
+      - "factory/benchmarks/**"
   workflow_dispatch:
     inputs:
       repository:
@@ -28,6 +29,7 @@ concurrency:
 env:
   PYTHONUNBUFFERED: "1"
   PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
   self-test:
@@ -37,24 +39,34 @@ jobs:
     steps:
       - name: Checkout factory
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
       - name: Runner diagnostics
         run: |
           set -euxo pipefail
           echo "runner=${RUNNER_NAME}"
           echo "os=${RUNNER_OS}"
+          echo "arch=${RUNNER_ARCH}"
           python --version
           python -m pip --version
           git --version
+          df -h
       - name: Compile factory
         run: python -m compileall -q factory
       - name: Run factory self-test
         run: python -m factory.selftest
       - name: Run recovery contract tests
         run: python -m factory.test_recovery
+      - name: Validate benchmark records
+        run: |
+          test -f factory/benchmarks/clt_platform/BASELINE.md
+          test -f factory/benchmarks/clt_platform/RECOVERY_PLAN.md
+          test -f factory/benchmarks/clt_platform/repository_index.json
 
   intake:
     if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -63,10 +75,20 @@ jobs:
     steps:
       - name: Checkout factory
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+      - name: Runner diagnostics
+        run: |
+          set -euxo pipefail
+          echo "runner=${RUNNER_NAME}"
+          echo "os=${RUNNER_OS}"
+          python --version
+          git --version
       - name: Run intake manager
         env:
           GITHUB_TOKEN: ${{ github.token }}
