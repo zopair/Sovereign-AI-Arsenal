@@ -1,0 +1,30 @@
+{
+  "selection_policy": "capability-first",
+  "candidates": [
+    {
+      "repository": "github/local-action",
+      "role": "local_action_reference",
+      "capabilities": ["local-action-patterns", "developer-preflight"],
+      "source": "https://github.com/github/local-action"
+    },
+    {
+      "repository": "MonolithProjects/ansible-github_actions_runner",
+      "role": "runner_provisioning_reference",
+      "capabilities": ["runner-provisioning", "automation", "self-hosted"],
+      "source": "https://github.com/MonolithProjects/ansible-github_actions_runner"
+    },
+    {
+      "repository": "debianmaster/actions-k3s",
+      "role": "lightweight-kubernetes-reference",
+      "capabilities": ["kubernetes", "container-orchestration", "ephemeral-workloads"],
+      "source": "https://github.com/debianmaster/actions-k3s"
+    },
+    {
+      "repository": "SanjulaGanepola/github-local-actions",
+      "role": "local-execution-reference",
+      "capabilities": ["local-execution", "github-actions-compatible-workflows"],
+      "source": "https://github.com/SanjulaGanepola/github-local-actions"
+    }
+  ],
+  "rule": "Repository names are hints only. The factory must evaluate capabilities, interfaces, isolation, reproducibility, maintenance, license, security, and integration cost before selecting an implementation."
+}
