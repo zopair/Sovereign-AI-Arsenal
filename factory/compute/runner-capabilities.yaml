@@ -1,0 +1,20 @@
+version: 1
+runners:
+  github-hosted:
+    labels: [linux, cpu, general]
+    capabilities: [python, node, docker]
+  self-hosted-android:
+    labels: [self-hosted, android]
+    capabilities: [android-sdk, emulator, apk]
+  self-hosted-gpu:
+    labels: [self-hosted, gpu]
+    capabilities: [cuda, inference, training]
+  self-hosted-browser:
+    labels: [self-hosted, browser]
+    capabilities: [chromium, playwright]
+selection:
+  required_capabilities: true
+  prefer_healthy: true
+  prefer_reproducible: true
+  cost_aware: true
+  fallback_order: [self-hosted-specialized, github-hosted]
