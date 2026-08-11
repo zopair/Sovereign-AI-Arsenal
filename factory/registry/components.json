@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "principles": [
+    "open_source_first",
+    "provider_neutral",
+    "license_aware",
+    "self_hostable_when_practical",
+    "replaceable_components",
+    "runtime_verified_release"
+  ],
+  "components": [
+    {"id":"github-actions","role":["ci","orchestration"],"repository":"https://github.com/features/actions","license":"platform"},
+    {"id":"gemini-cli","role":["agent","coding","cli"],"repository":"https://github.com/google-gemini/gemini-cli","license":"Apache-2.0"},
+    {"id":"semantic-kernel","role":["agents","orchestration"],"repository":"https://github.com/microsoft/semantic-kernel","license":"MIT"},
+    {"id":"nemo","role":["training","inference","agents"],"repository":"https://github.com/NVIDIA/NeMo","license":"Apache-2.0"},
+    {"id":"llama","role":["llm","local-inference"],"repository":"https://github.com/meta-llama/llama","license":"llama-license"},
+    {"id":"openai-python","role":["llm","api"],"repository":"https://github.com/openai/openai-python","license":"Apache-2.0"},
+    {"id":"huggingface-transformers","role":["models","inference","training"],"repository":"https://github.com/huggingface/transformers","license":"Apache-2.0"},
+    {"id":"ollama","role":["local-inference"],"repository":"https://github.com/ollama/ollama","license":"MIT"},
+    {"id":"vllm","role":["inference","serving"],"repository":"https://github.com/vllm-project/vllm","license":"Apache-2.0"},
+    {"id":"langchain","role":["agents","rag","orchestration"],"repository":"https://github.com/langchain-ai/langchain","license":"MIT"},
+    {"id":"autogen","role":["agents","orchestration"],"repository":"https://github.com/microsoft/autogen","license":"MIT"},
+    {"id":"crewai","role":["agents","orchestration"],"repository":"https://github.com/crewAIInc/crewAI","license":"MIT"},
+    {"id":"supabase","role":["database","auth","storage","backend"],"repository":"https://github.com/supabase/supabase","license":"Apache-2.0"},
+    {"id":"appwrite","role":["backend","auth","database","storage"],"repository":"https://github.com/appwrite/appwrite","license":"BSD-3-Clause"},
+    {"id":"n8n","role":["automation","workflow"],"repository":"https://github.com/n8n-io/n8n","license":"fair-code-evaluation-required"},
+    {"id":"activepieces","role":["automation","workflow"],"repository":"https://github.com/activepieces/activepieces","license":"MIT"},
+    {"id":"flowise","role":["ai-workflows","rag","agents"],"repository":"https://github.com/FlowiseAI/Flowise","license":"Apache-2.0"},
+    {"id":"tldraw","role":["ui","canvas"],"repository":"https://github.com/tldraw/tldraw","license":"tldraw-license"},
+    {"id":"flutter","role":["mobile","ui"],"repository":"https://github.com/flutter/flutter","license":"BSD-3-Clause"},
+    {"id":"fastlane","role":["mobile","release","automation"],"repository":"https://github.com/fastlane/fastlane","license":"MIT"}
+  ]
+}
