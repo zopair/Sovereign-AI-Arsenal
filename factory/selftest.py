@@ -1,4 +1,5 @@
 from factory.manager import detect_capabilities, repo_identity
+from factory.planner import plan
 
 
 def test_repo_identity() -> None:
@@ -14,7 +15,15 @@ def test_capability_detection() -> None:
     assert {"node", "android", "github_actions", "testing", "ai", "database"}.issubset(capabilities)
 
 
+def test_planner() -> None:
+    result = plan(["web", "ai", "agents", "database"])
+    selected = {item["capability"] for item in result["selected"]}
+    assert selected == {"web", "ai", "agents", "database"}
+    assert all(item["repository"] and item["license"] for item in result["selected"])
+
+
 if __name__ == "__main__":
     test_repo_identity()
     test_capability_detection()
+    test_planner()
     print("factory self-test: PASS")
