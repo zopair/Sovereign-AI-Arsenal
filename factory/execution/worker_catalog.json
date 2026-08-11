@@ -1,0 +1,20 @@
+{
+  "references": [
+    {
+      "name": "nektos/act",
+      "purpose": "Run GitHub Actions locally using Docker; useful as a workflow-execution simulation reference.",
+      "role": "workflow-simulator"
+    },
+    {
+      "name": "actions-runner-controller ecosystem",
+      "purpose": "Controller patterns for provisioning/scaling GitHub Actions runners on Kubernetes.",
+      "role": "runner-orchestration-reference"
+    }
+  ],
+  "factory_worker": {
+    "name": "vm-agent",
+    "contract": "factory/execution/vm_agent.py",
+    "simulator": true,
+    "real_vm_required_for_production": true
+  }
+}
