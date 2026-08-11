@@ -64,6 +64,10 @@ jobs:
         run: python -m factory.test_recovery
       - name: Run execution broker tests
         run: python -m factory.execution.test_runner_broker
+      - name: Run runtime tests
+        run: python -m factory.runtime.test_runtime
+      - name: Run runtime smoke
+        run: python -m factory.runtime.runtime_smoke
       - name: Validate benchmark records
         run: |
           test -f factory/benchmarks/clt_platform/BASELINE.md
