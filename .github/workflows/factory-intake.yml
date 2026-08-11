@@ -1,0 +1,43 @@
+name: Factory Intake
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "GitHub repository to inspect (owner/name)"
+        required: true
+        type: string
+      save_report:
+        description: "Persist the generated intake report"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout factory
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run intake manager
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p factory/reports
+          python -m factory.manager "${{ inputs.repository }}" | tee "factory/reports/intake.json"
+
+      - name: Upload intake report
+        if: ${{ inputs.save_report }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-intake-${{ github.run_number }}
+          path: factory/reports/intake.json
