@@ -1,6 +1,7 @@
 from factory.manager import detect_capabilities, repo_identity
 from factory.planner import plan
 from factory.router import ProviderRouter
+from factory.execution import ExecutionRequest, RunnerBroker, DEFAULT_BACKENDS
 
 
 def test_repo_identity() -> None:
@@ -39,9 +40,18 @@ def test_provider_router() -> None:
     assert alternate["id"] != selected["id"]
 
 
+def test_execution_broker() -> None:
+    broker = RunnerBroker(DEFAULT_BACKENDS)
+    selected = broker.select(ExecutionRequest(frozenset({"linux", "ci", "isolated"})))
+    assert selected.name == "container"
+    failover = broker.failover_order(ExecutionRequest(frozenset({"linux", "ci"})))
+    assert len(failover) >= 2
+
+
 if __name__ == "__main__":
     test_repo_identity()
     test_capability_detection()
     test_planner()
     test_provider_router()
+    test_execution_broker()
     print("factory self-test: PASS")
