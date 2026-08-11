@@ -1,0 +1,54 @@
+{
+  "repository": "zopair/CLT-Platform",
+  "ref": "main",
+  "inspection_mode": "direct_github_contents_and_git_tree",
+  "code_search_index_required": false,
+  "tree_truncated": false,
+  "source_files": [
+    "main.py",
+    "automation/refactor_engine.py",
+    "core/github_client/client.py",
+    "core/logging/logger.py",
+    "orchestration/dispatcher.py",
+    "orchestration/health_monitor.py",
+    "services/hunter_ai_adapter.py",
+    "services/sinc_os_adapter.py"
+  ],
+  "detected_languages": ["Python"],
+  "detected_build_manifest": null,
+  "detected_test_suite": null,
+  "runtime_smoke_test": {
+    "method": "local_reproduction_of_inspected_source",
+    "compileall_exit_code": 0,
+    "main_exit_code": 0
+  },
+  "implementation_depth": {
+    "main": "partial",
+    "github_client": "partial",
+    "health_monitor": "stub",
+    "dispatcher": "stub",
+    "refactor_engine": "stub",
+    "hunter_ai_adapter": "stub",
+    "sinc_os_adapter": "stub",
+    "logger": "minimal"
+  },
+  "production_readiness": "blocked",
+  "blockers": [
+    "missing dependency/build manifest",
+    "missing automated tests",
+    "hard-coded health result",
+    "non-functional dispatcher",
+    "empty provider adapters",
+    "no-op refactor engine",
+    "HTTP client lacks timeout/status/error handling"
+  ],
+  "factory_capability_gaps": [
+    "source-truth/stub detection",
+    "dependency reproducibility gate",
+    "test discovery gate",
+    "evidence-backed health scoring",
+    "runtime smoke-test adapter",
+    "repository access fallback"
+  ],
+  "evidence_commit": "5a10676cff78c93096ee43c54e1410d18fcb5c9f"
+}
