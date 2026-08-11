@@ -1,0 +1,21 @@
+{
+  "policy": {
+    "selection": "capability_first",
+    "source_only": "public_open_source_reference",
+    "execution": "sandbox_before_production",
+    "promotion": "evidence_required"
+  },
+  "agents": [
+    {"name":"OpenHands","repo":"All-Hands-AI/OpenHands","role":"software_engineer","tier":"A"},
+    {"name":"SWE-agent","repo":"SWE-agent/SWE-agent","role":"software_repair","tier":"A"},
+    {"name":"mini-swe-agent","repo":"SWE-agent/mini-swe-agent","role":"lightweight_software_repair","tier":"A"},
+    {"name":"LangGraph","repo":"langchain-ai/langgraph","role":"stateful_orchestration","tier":"A"},
+    {"name":"CrewAI","repo":"crewAIInc/crewAI","role":"role_based_multi_agent","tier":"B"},
+    {"name":"Letta","repo":"letta-ai/letta","role":"long_term_memory","tier":"A"},
+    {"name":"smolagents","repo":"huggingface/smolagents","role":"lightweight_tool_agents","tier":"A"},
+    {"name":"PydanticAI","repo":"pydantic/pydantic-ai","role":"typed_agent_contracts","tier":"A"}
+  ],
+  "not_embedded_by_default": [
+    "Large frameworks are references/adapters until an integration test proves production value."
+  ]
+}
