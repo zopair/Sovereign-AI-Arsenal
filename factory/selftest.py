@@ -2,6 +2,7 @@ from factory.manager import detect_capabilities, repo_identity
 from factory.planner import plan
 from factory.router import ProviderRouter
 from factory.execution import ExecutionRequest, RunnerBroker, DEFAULT_BACKENDS
+from factory.execution.production_gate import test_production_gate
 
 
 def test_repo_identity() -> None:
@@ -54,4 +55,5 @@ if __name__ == "__main__":
     test_planner()
     test_provider_router()
     test_execution_broker()
+    test_production_gate()
     print("factory self-test: PASS")
