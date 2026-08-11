@@ -17,6 +17,17 @@ The AI Application Factory is a provider-neutral, open-source-first production s
 11. Production-impacting operations require an explicit approval gate unless a project policy says otherwise.
 12. The factory must remain useful when any single AI provider, cloud, runner, repository, or gateway is unavailable.
 
+## Completion and recovery rules
+
+13. A discovered problem is not a terminal project state. Classify it, isolate its impact, and attempt an appropriate recovery strategy.
+14. Failure of one provider, task, component, or project node must not unnecessarily stop unrelated work. Use dependency-aware scheduling and continue independent work whenever safe.
+15. Recovery may rotate strategy, agent, provider, tool, repository implementation, or compute runner. Prefer the smallest reversible change that restores progress.
+16. Every recovery attempt has explicit time, cost, and retry/strategy budgets. Avoid infinite retry loops.
+17. A task may enter `BLOCKED` only after its allowed recovery strategies are exhausted or a safety/approval boundary is reached. `BLOCKED` is not equivalent to `PROJECT_FAILED`.
+18. Successful recovery must be verified with executable evidence before the project advances.
+19. Verified recoveries become reusable recipes with evidence, scope, and success history.
+20. The factory's primary responsibility is completion of the requested production outcome, not merely diagnosis of failure.
+
 ## Quality principle
 
 A green build is necessary but not sufficient. Release evidence should include the relevant runtime, API, UI, security, license, and platform checks for the project type.
