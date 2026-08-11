@@ -1,24 +1,16 @@
-"""Deterministic end-to-end gate for the provider-neutral execution path."""
+"""Deterministic gate for provider-neutral execution."""
 from .local_worker import LocalWorker
-from .worker_protocol import ExecutionBroker, JobEvidence, JobState, WorkerRecord
+from .worker_protocol import ExecutionBroker, JobState
 
 
 def run_gate() -> dict[str, object]:
     worker = LocalWorker()
-    result = worker.run_self_check()
     broker = ExecutionBroker()
-    broker.register(WorkerRecord(worker.worker_id, worker.capabilities, heartbeat_at=0))
+    broker.register(worker.record())
     selected = broker.select(frozenset({"linux", "python", "ci"}))
-    evidence = JobEvidence(
-        job_id="production-gate",
-        state=JobState.SUCCEEDED if result["ok"] else JobState.FAILED,
-        worker_id=selected.worker_id,
-        logs=[result["stdout"]],
-        started_at=1.0,
-        finished_at=2.0,
-    )
+    evidence = worker.run_self_check()
     return {
-        "ok": bool(result["ok"] and evidence.has_execution_evidence()),
+        "ok": evidence.state == JobState.SUCCEEDED and evidence.has_execution_evidence(),
         "worker": selected.worker_id,
         "evidence": evidence,
     }
