@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "principles": [
     "open_source_first",
     "provider_neutral",
@@ -15,6 +15,9 @@
     {"id":"nemo","role":["training","inference","agents"],"repository":"https://github.com/NVIDIA/NeMo","license":"Apache-2.0"},
     {"id":"llama","role":["llm","local-inference"],"repository":"https://github.com/meta-llama/llama","license":"llama-license"},
     {"id":"openai-python","role":["llm","api"],"repository":"https://github.com/openai/openai-python","license":"Apache-2.0"},
+    {"id":"grok-sdk","role":["llm","api"],"repository":"https://github.com/xai-org","license":"provider-dependent"},
+    {"id":"zai-sdk-python","role":["llm","api","multimodal"],"repository":"https://github.com/zai-org/z-ai-sdk-python","license":"provider-dependent"},
+    {"id":"glm-5","role":["llm","local-or-api"],"repository":"https://github.com/zai-org/GLM-5","license":"model-dependent"},
     {"id":"huggingface-transformers","role":["models","inference","training"],"repository":"https://github.com/huggingface/transformers","license":"Apache-2.0"},
     {"id":"ollama","role":["local-inference"],"repository":"https://github.com/ollama/ollama","license":"MIT"},
     {"id":"vllm","role":["inference","serving"],"repository":"https://github.com/vllm-project/vllm","license":"Apache-2.0"},
@@ -28,6 +31,12 @@
     {"id":"flowise","role":["ai-workflows","rag","agents"],"repository":"https://github.com/FlowiseAI/Flowise","license":"Apache-2.0"},
     {"id":"tldraw","role":["ui","canvas"],"repository":"https://github.com/tldraw/tldraw","license":"tldraw-license"},
     {"id":"flutter","role":["mobile","ui"],"repository":"https://github.com/flutter/flutter","license":"BSD-3-Clause"},
-    {"id":"fastlane","role":["mobile","release","automation"],"repository":"https://github.com/fastlane/fastlane","license":"MIT"}
-  ]
+    {"id":"fastlane","role":["mobile","release","automation"],"repository":"https://github.com/fastlane/fastlane","license":"MIT"},
+    {"id":"replit","role":["cloud-development","platform"],"repository":"https://github.com/replit","license":"platform-dependent"},
+    {"id":"lovable","role":["app-generation","platform"],"repository":"https://github.com/lovable","license":"platform-dependent"}
+  ],
+  "notes": {
+    "zai": "Z.ai SDK/model repositories are included as provider references; verify the exact model/service license before redistribution.",
+    "replit_lovable": "Tracked as platform references, not assumed to be fully open-source implementations."
+  }
 }
