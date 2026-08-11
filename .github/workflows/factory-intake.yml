@@ -1,6 +1,10 @@
 name: Factory Intake
 
 on:
+  push:
+    paths:
+      - "factory/**"
+      - ".github/workflows/factory-intake.yml"
   workflow_dispatch:
     inputs:
       repository:
@@ -17,24 +21,35 @@ permissions:
   contents: read
 
 jobs:
+  self-test:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile factory
+        run: python -m compileall -q factory
+      - name: Run self-test
+        run: python factory/selftest.py
+
   intake:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout factory
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Run intake manager
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           mkdir -p factory/reports
           python -m factory.manager "${{ inputs.repository }}" | tee "factory/reports/intake.json"
-
       - name: Upload intake report
         if: ${{ inputs.save_report }}
         uses: actions/upload-artifact@v4
