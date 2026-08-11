@@ -62,6 +62,8 @@ jobs:
         run: python -m factory.selftest
       - name: Run recovery contract tests
         run: python -m factory.test_recovery
+      - name: Run execution broker tests
+        run: python -m factory.execution.test_runner_broker
       - name: Validate benchmark records
         run: |
           test -f factory/benchmarks/clt_platform/BASELINE.md
@@ -87,6 +89,7 @@ jobs:
           set -euxo pipefail
           echo "runner=${RUNNER_NAME}"
           echo "os=${RUNNER_OS}"
+          echo "arch=${RUNNER_ARCH}"
           python --version
           git --version
       - name: Run intake manager
