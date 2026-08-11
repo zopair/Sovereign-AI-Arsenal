@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Factory Provenance Record",
+  "type": "object",
+  "required": ["event_id", "timestamp", "project", "actor", "action"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "timestamp": {"type": "string"},
+    "project": {"type": "string"},
+    "actor": {"type": "object"},
+    "action": {"type": "string"},
+    "source": {"type": "object"},
+    "inputs": {"type": "object"},
+    "outputs": {"type": "object"},
+    "verification": {"type": "object"}
+  }
+}
