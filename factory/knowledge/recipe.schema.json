@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Factory Verified Recipe",
+  "type": "object",
+  "required": ["id", "problem", "verification"],
+  "properties": {
+    "id": {"type": "string"},
+    "problem": {"type": "object"},
+    "environment": {"type": "object"},
+    "root_cause": {"type": "string"},
+    "solution": {"type": "object"},
+    "alternatives": {"type": "array", "items": {"type": "object"}},
+    "verification": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["verified", "failed", "experimental"]},
+        "evidence": {"type": "array", "items": {"type": "string"}},
+        "verified_at": {"type": "string"}
+      }
+    },
+    "provenance": {"type": "object"}
+  }
+}
