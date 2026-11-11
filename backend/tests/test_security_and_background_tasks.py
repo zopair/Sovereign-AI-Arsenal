@@ -186,3 +186,21 @@ def test_github_token_scope_validation_is_async_for_aiohttp_context():
         and node.name == "validate_github_token_scope"
     )
     assert isinstance(method, ast.AsyncFunctionDef)
+
+
+def test_sandbox_workflow_uses_supported_artifacts_and_exposes_test_outputs():
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows" / "sandbox-test.yml").read_text(encoding="utf-8")
+
+    assert "uses: actions/upload-artifact@v4" in workflow
+    assert "actions/upload-artifact@v3" not in workflow
+    assert "      id: test" in workflow
+    assert "steps.test.outputs.results" in workflow
+
+
+def test_cryptography_pin_is_a_published_release():
+    requirements = (
+        Path(__file__).resolve().parents[1] / "requirements.txt"
+    ).read_text(encoding="utf-8")
+    assert "cryptography==41.0.7" in requirements
+    assert "cryptography==41.0.8" not in requirements
