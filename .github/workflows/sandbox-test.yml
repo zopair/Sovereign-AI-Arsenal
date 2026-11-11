@@ -46,6 +46,7 @@ jobs:
         pip install -r requirements.txt
 
     - name: Test sandbox functionality
+      id: test
       run: |
         cd backend
         
@@ -197,7 +198,7 @@ jobs:
 
     - name: Upload test artifacts
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sandbox-test-${{ matrix.test_repo.name }}
         path: |
