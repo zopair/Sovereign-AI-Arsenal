@@ -106,6 +106,7 @@ jobs:
                 logger.info(f"Dependencies found: {len(result.dependencies)}")
                 logger.info(f"Security issues: {len(result.security_issues)}")
                 logger.info(f"Error logs: {result.error_logs}")
+                logger.info(f"Test output: {result.test_output}")
                 
                 # Save test results
                 test_results = {
@@ -118,6 +119,7 @@ jobs:
                     'dependencies_count': len(result.dependencies),
                     'security_issues_count': len(result.security_issues),
                     'error_logs': result.error_logs,
+                    'test_output': result.test_output,
                     'file_structure': result.file_structure,
                     'expected_complexity': '${{ matrix.test_repo.expected_complexity }}',
                     'timestamp': datetime.utcnow().isoformat()
