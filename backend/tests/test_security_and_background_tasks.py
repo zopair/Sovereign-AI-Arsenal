@@ -87,3 +87,23 @@ def test_workers_open_their_own_database_sessions():
                 and item.func.attr == "get_session"
             ]
             assert calls, f"{node.name} must create its own database sessions"
+
+
+def test_analysis_passes_attribute_based_repository_snapshot_to_discovery():
+    routes_path = Path(__file__).resolve().parents[1] / "api" / "routes.py"
+    tree = ast.parse(routes_path.read_text(encoding="utf-8"))
+    worker = next(
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "perform_comprehensive_analysis"
+    )
+
+    metric_call = next(
+        node for node in ast.walk(worker)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "update_repository_metrics"
+    )
+    assert isinstance(metric_call.args[0], ast.Call)
+    assert isinstance(metric_call.args[0].func, ast.Name)
+    assert metric_call.args[0].func.id == "SimpleNamespace"
