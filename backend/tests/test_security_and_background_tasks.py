@@ -48,3 +48,42 @@ def test_request_handlers_do_not_pass_request_session_to_background_workers():
                 isinstance(argument, ast.Name)
                 and argument.id in {"db", "session"}
             )
+
+
+def test_main_protects_api_and_metrics_and_allows_cors_preflight():
+    main_path = Path(__file__).resolve().parents[1] / "main.py"
+    source = main_path.read_text(encoding="utf-8")
+
+    assert 'request.url.path.startswith("/api/")' in source
+    assert 'request.url.path == "/metrics"' in source
+    assert 'request.method != "OPTIONS"' in source
+    assert '"X-API-Key"' in source
+    assert '"API_AUTH_TOKEN"' in source
+
+
+def test_compose_requires_api_auth_token_before_startup():
+    root = Path(__file__).resolve().parents[2]
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    example = (root / ".env.example").read_text(encoding="utf-8")
+
+    assert '${API_AUTH_TOKEN:?API_AUTH_TOKEN must be set}' in compose
+    assert "API_AUTH_TOKEN=" in example
+
+
+def test_workers_open_their_own_database_sessions():
+    routes_path = Path(__file__).resolve().parents[1] / "api" / "routes.py"
+    tree = ast.parse(routes_path.read_text(encoding="utf-8"))
+    worker_names = {
+        "discover_and_analyze_repositories",
+        "perform_comprehensive_analysis",
+    }
+
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in worker_names:
+            calls = [
+                item for item in ast.walk(node)
+                if isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Attribute)
+                and item.func.attr == "get_session"
+            ]
+            assert calls, f"{node.name} must create its own database sessions"
