@@ -27,6 +27,9 @@ def test_database_url_rejects_missing_password():
     with pytest.raises(ValueError, match="DB_PASSWORD"):
         build_database_url({"DB_USER": "app_user"}, {})
 
+    with pytest.raises(ValueError, match="DB_PASSWORD"):
+        build_database_url({}, {"password": "unsafe-config-default"})
+
 
 def test_compose_does_not_enable_trust_authentication_or_default_passwords():
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
