@@ -1,6 +1,8 @@
 name: Daily Repository Update
 
 on:
+  pull_request:
+    branches: [main]
   schedule:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
@@ -17,12 +19,33 @@ on:
         type: number
         default: 100
 
+permissions:
+  contents: write
+
 env:
   PYTHON_VERSION: '3.11'
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
+  validate-workflow:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Install actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Validate workflow syntax and expressions
+        run: actionlint -ignore 'SC2086' -ignore 'SC2129' .github/workflows/daily-update.yml
+
   update-repositories:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     
@@ -31,7 +54,7 @@ jobs:
         image: postgres:15
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sovereign_ai arsenal
+          POSTGRES_DB: sovereign_ai_arsenal
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -57,7 +80,7 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -79,31 +102,21 @@ jobs:
         pip install pytest pytest-asyncio
 
     - name: Set up environment variables
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_ai_arsenal
+        REDIS_URL: redis://localhost:6379/0
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         cd backend
         cp .env.example .env
-        
-        # Set database URL
-        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/sovereign ai arsenal" >> .env
-        
-        # Set Redis URL
-        echo "REDIS_URL=redis://localhost:6379/0" >> .env
-        
-        # Set GitHub token (if available)
-        if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
-          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env
-        fi
-        
-        # Set OpenAI token (if available)
-        if [ -n "${{ secrets.OPENAI_API_KEY }}" ]; then
-          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
-        fi
-        
-        # Set other environment variables
-        echo "LOG_LEVEL=INFO" >> .env
-        echo "API_HOST=0.0.0.0" >> .env
-        echo "API_PORT=8000" >> .env
-        echo "DEBUG=false" >> .env
+        {
+          printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
+          printf 'REDIS_URL=%s\n' "$REDIS_URL"
+          printf 'GITHUB_TOKEN=%s\n' "$GITHUB_TOKEN"
+          printf 'OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY"
+          printf 'LOG_LEVEL=INFO\nAPI_HOST=0.0.0.0\nAPI_PORT=8000\nDEBUG=false\n'
+        } >> .env
 
     - name: Wait for services
       run: |
@@ -407,8 +420,8 @@ jobs:
         EOF
         
         # Run the update script
-        MAX_REPOS=${{ github.event.inputs.max_repos || '100' }}
-        FORCE_UPDATE=${{ github.event.inputs.force_update == 'true' || 'false' }}
+        MAX_REPOS="${{ github.event.inputs.max_repos || '100' }}"
+        FORCE_UPDATE="${{ github.event.inputs.force_update == 'true' || 'false' }}"
         
         echo "Running repository update with MAX_REPOS=$MAX_REPOS, FORCE_UPDATE=$FORCE_UPDATE"
         
@@ -432,46 +445,68 @@ jobs:
     - name: Generate summary report
       if: always()
       run: |
-        cd backend
-        
-        # Create summary report
-        cat > summary_report.md << 'EOF'
-        # Daily Repository Update Summary
-        
-        **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        
-        ## Update Results
-        
-        ${{ steps.update.outputs.results && format('{0}', fromJson(steps.update.outputs.results).processed || 'N/A') }} repositories processed
-        ${{ steps.update.outputs.results && format('{0}', fromJson(steps.update.outputs.results).new || 'N/A') }} new repositories
-        ${{ steps.update.outputs.results && format('{0}', fromJson(steps.update.outputs.results).updated || 'N/A') }} updated repositories
-        
-        ## Top Categories
-        
-        ${{ steps.update.outputs.results && format('{0}', fromJson(steps.update.outputs.results).categories | to_entries | map('[key, value]' | join(': ')) | join('\n- ') || 'No data') }}
-        
-        ## Top Repositories
-        
-        ${{ steps.update.outputs.results && format('{0}', fromJson(steps.update.outputs.results).top_repositories | map('[.name, .score]' | join(' - ') | join('\n- ') || 'No data') }}
-        
-        ## Execution Details
-        
-        - **Execution Time:** ${{ steps.update.outputs.results && fromJson(steps.update.outputs.results).execution_time || 'N/A' }}
-        - **Errors:** ${{ steps.update.outputs.results && fromJson(steps.update.outputs.results).errors | length || 0 }}
-        
-        EOF
-        
-        echo "Summary report generated:"
-        cat summary_report.md
+        python - <<'PY'
+        import json
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        result_path = Path('/tmp/update_results.json')
+        if result_path.exists():
+            results = json.loads(result_path.read_text(encoding='utf-8'))
+        else:
+            results = {}
+
+        categories = results.get('categories') or {}
+        top_repositories = results.get('top_repositories') or []
+        errors = results.get('errors') or []
+
+        lines = [
+            '# Daily Repository Update Summary',
+            '',
+            f"**Date:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+            '',
+            '## Update Results',
+            '',
+            f"- Processed: {results.get('processed', 'N/A')}",
+            f"- New: {results.get('new', 'N/A')}",
+            f"- Updated: {results.get('updated', 'N/A')}",
+            f"- Discovered: {results.get('discovered', 'N/A')}",
+            '',
+            '## Categories',
+            '',
+        ]
+        lines.extend(f"- {name}: {count}" for name, count in sorted(categories.items()))
+        if not categories:
+            lines.append('- No category data available')
+
+        lines.extend(['', '## Top Repositories', ''])
+        lines.extend(
+            f"- {item.get('name', 'unknown')} — score {item.get('score', 'N/A')}"
+            for item in top_repositories[:10]
+        )
+        if not top_repositories:
+            lines.append('- No repository scores available')
+
+        lines.extend([
+            '',
+            '## Execution Details',
+            '',
+            f"- Execution time: {results.get('execution_time', 'N/A')}",
+            f"- Errors: {len(errors)}",
+            '',
+        ])
+        Path('backend/summary_report.md').write_text('\n'.join(lines), encoding='utf-8')
+        print('Summary report generated.')
+        PY
 
     - name: Commit and push changes
-      if: always()
+      if: success() && steps.update.outputs.results != ''
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         
         # Add any new files
-        git add -A
+        git add backend/summary_report.md
         
         # Check if there are changes to commit
         if git diff --staged --quiet; then
@@ -555,7 +590,7 @@ jobs:
         bandit -r backend/ -f json -o security-report.json || true
     
     - name: Upload security report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-report
         path: security-report.json

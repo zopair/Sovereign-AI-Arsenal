@@ -62,8 +62,17 @@ class DockerSandboxManager:
         """Initialize Docker client"""
         try:
             self.docker_client = docker.from_env()
-            # Test connection
+            # Test daemon connectivity before attempting any image operations.
             self.docker_client.ping()
+
+            # Ensure the configured execution image exists locally.
+            try:
+                self.docker_client.images.get(self.image_name)
+                logger.info("Sandbox image already available: %s", self.image_name)
+            except docker.errors.ImageNotFound:
+                logger.info("Pulling missing sandbox image: %s", self.image_name)
+                self.docker_client.images.pull(self.image_name)
+
             logger.info("Docker client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Docker client: {e}")
@@ -170,7 +179,6 @@ class DockerSandboxManager:
                 'git', 'clone',
                 '--depth', '1',  # Shallow clone for speed
                 '--single-branch',
-                '--timeout', '60',
                 clone_url,
                 str(workspace_path / repo_name)
             ]
@@ -363,7 +371,11 @@ class DockerSandboxManager:
                     working_dir='/app',
                     volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
                     mem_limit=self.memory_limit,
-                    cpu_limit=float(self.cpu_limit),
+                    nano_cpus=int(float(self.cpu_limit) * 1_000_000_000),
+                        environment={
+                            'PYTHONDONTWRITEBYTECODE': '1',
+                            'PYTEST_ADDOPTS': '-p no:cacheprovider',
+                        },
                     security_opt=['no-new-privileges'],
                     read_only=False,  # Need write access for pip cache
                     detach=True
@@ -438,13 +450,27 @@ class DockerSandboxManager:
             container = None
             try:
                 for cmd in test_commands:
+                    test_bootstrap = (
+                        'python -m pip install --disable-pip-version-check --upgrade pip && '
+                        'python -m pip install --disable-pip-version-check pytest && '
+                        'if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; '
+                        'elif [ -f setup.py ] || [ -f pyproject.toml ]; then python -m pip install -e .; fi && '
+                        'if [ -f pyproject.toml ] && grep -q "^\\\\[dependency-groups\\\\]" pyproject.toml '
+                        '&& grep -q "^tests = \\\\[" pyproject.toml; then '
+                        'python -m pip install --group tests; fi && '
+                    )
+                    test_command = ['sh', '-lc', test_bootstrap + ' '.join(cmd)]
                     container = self.docker_client.containers.create(
                         image=self.image_name,
-                        command=cmd,
+                        command=test_command,
                         working_dir='/app',
                         volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
                         mem_limit=self.memory_limit,
-                        cpu_limit=float(self.cpu_limit),
+                        nano_cpus=int(float(self.cpu_limit) * 1_000_000_000),
+                        environment={
+                            'PYTHONDONTWRITEBYTECODE': '1',
+                            'PYTEST_ADDOPTS': '-p no:cacheprovider',
+                        },
                         security_opt=['no-new-privileges'],
                         detach=True
                     )

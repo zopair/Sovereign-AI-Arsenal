@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import logging
@@ -349,8 +350,8 @@ async def get_categories(db: Session = Depends(get_db)):
     try:
         categories = db.query(
             Classification.category,
-            db.func.count(Classification.id).label('count')
-        ).group_by(Classification.category).order_by(db.func.count(Classification.id).desc()).all()
+            func.count(Classification.id).label('count')
+        ).group_by(Classification.category).order_by(func.count(Classification.id).desc()).all()
         
         result = [
             {'category': category, 'repository_count': count}
@@ -413,20 +414,20 @@ async def get_statistics(db: Session = Depends(get_db)):
     """Get platform statistics"""
     try:
         total_repos = db.query(Repository).count()
-        total_stars = db.query(db.func.sum(Repository.stargazers_count)).scalar() or 0
-        total_forks = db.query(db.func.sum(Repository.forks_count)).scalar() or 0
+        total_stars = db.query(func.sum(Repository.stargazers_count)).scalar() or 0
+        total_forks = db.query(func.sum(Repository.forks_count)).scalar() or 0
         
         # Language distribution
         languages = db.query(
             Repository.language,
-            db.func.count(Repository.id).label('count')
-        ).filter(Repository.language.isnot(None)).group_by(Repository.language).order_by(db.func.count(Repository.id).desc()).limit(10).all()
+            func.count(Repository.id).label('count')
+        ).filter(Repository.language.isnot(None)).group_by(Repository.language).order_by(func.count(Repository.id).desc()).limit(10).all()
         
         # Category distribution
         categories = db.query(
             Classification.category,
-            db.func.count(Classification.id).label('count')
-        ).group_by(Classification.category).order_by(db.func.count(Classification.id).desc()).limit(10).all()
+            func.count(Classification.id).label('count')
+        ).group_by(Classification.category).order_by(func.count(Classification.id).desc()).limit(10).all()
         
         # Recent activity
         recent_repos = db.query(Repository).filter(
