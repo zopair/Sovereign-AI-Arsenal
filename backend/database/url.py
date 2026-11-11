@@ -18,7 +18,7 @@ def build_database_url(
     port = int(values.get("DB_PORT") or settings.get("port") or 5432)
     database = values.get("DB_NAME") or str(settings.get("name") or "sovereign_ai_arsenal")
     username = values.get("DB_USER") or str(settings.get("user") or "app_user")
-    password = values.get("DB_PASSWORD") or str(settings.get("password") or "")
+    password = values.get("DB_PASSWORD") or ""
 
     if not password:
         raise ValueError("DB_PASSWORD must be set; refusing an empty database credential")
