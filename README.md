@@ -1,6 +1,6 @@
 # Sovereign AI Arsenal
 
-A production-grade AI intelligence platform for discovering, analyzing, and monitoring AI-related repositories. Built with FastAPI, PostgreSQL, and advanced AI analytics.
+A modular AI intelligence platform for discovering, analyzing, and monitoring AI-related repositories. Built with FastAPI, PostgreSQL, and advanced AI analytics.
 
 ## 🚀 Features
 
@@ -14,7 +14,7 @@ A production-grade AI intelligence platform for discovering, analyzing, and moni
 
 ### Technical Highlights
 - **Modular Architecture**: Clean, scalable design with separation of concerns
-- **Production-Ready**: Comprehensive logging, error handling, and monitoring
+- **Operational Foundations**: Structured logging, health checks, and monitoring integrations
 - **High Performance**: Async operations, caching, and optimized database queries
 - **Containerized**: Full Docker support with orchestration
 - **API-First**: RESTful API with comprehensive documentation
@@ -344,7 +344,7 @@ Configure alerts in Prometheus for:
 
 ### Authentication
 
-The platform supports multiple authentication methods:
+Authentication is not yet enforced at the API boundary. Do not expose the API publicly until authentication and authorization are implemented and tested. The following mechanisms are planned, not currently verified:
 
 - API Keys (for programmatic access)
 - JWT Tokens (for web applications)
@@ -363,10 +363,10 @@ api:
 
 ### Data Protection
 
-- All sensitive data encrypted at rest
-- API communications over HTTPS
-- Regular security updates
-- Audit logging for all operations
+- Keep database and monitoring ports on loopback unless a reviewed deployment requires otherwise
+- Supply credentials through environment variables or a secret manager
+- Terminate public traffic through a configured TLS reverse proxy
+- Add encryption-at-rest and audit controls before production use
 
 ## 🚀 Deployment
 
