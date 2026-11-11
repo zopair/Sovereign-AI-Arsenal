@@ -41,7 +41,8 @@ cd sovereign-ai-arsenal
 2. **Configure environment variables**
 ```bash
 cp .env.example .env
-# Replace both placeholder secrets with unique random values before startup
+# Generate two different secrets with: openssl rand -hex 32
+# Put one in DB_PASSWORD and the other in GRAFANA_ADMIN_PASSWORD, then save the file
 ```
 
 3. **Start the platform**
@@ -53,6 +54,8 @@ docker compose up -d
 - API: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
 - Grafana Dashboard: http://localhost:3000 (admin; password from GRAFANA_ADMIN_PASSWORD)
+- PostgreSQL: localhost:5432 (local development access only)
+- Redis is internal to the Compose network and is not published on the host
 - Prometheus: http://localhost:9090
 
 ### Manual Installation
