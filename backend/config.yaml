@@ -3,11 +3,10 @@ version: "1.0.0"
 description: "Production-grade AI intelligence platform for discovering and analyzing AI repositories"
 
 database:
-  host: ${DB_HOST:localhost}
-  port: ${DB_PORT:5432}
-  name: ${DB_NAME:sovereign_ai_arsenal}
-  user: ${DB_USER:postgres}
-  password: ${DB_PASSWORD:password}
+  host: localhost
+  port: 5432
+  name: sovereign_ai_arsenal
+  user: app_user
   pool_size: 10
   max_overflow: 20
 
@@ -44,9 +43,9 @@ logging:
   backup_count: 5
 
 redis:
-  host: ${REDIS_HOST:localhost}
-  port: ${REDIS_PORT:6379}
-  password: ${REDIS_PASSWORD:}
+  host: localhost
+  port: 6379
+  password: ""
   db: 0
 
 vector_store:
@@ -59,7 +58,7 @@ api:
   host: "0.0.0.0"
   port: 8000
   debug: false
-  cors_origins: ["*"]
+  cors_origins: []
   rate_limiting:
     requests_per_minute: 100
     burst_size: 20
