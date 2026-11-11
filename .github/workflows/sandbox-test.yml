@@ -157,13 +157,13 @@ jobs:
 
         RESULTS="$(cat /tmp/sandbox_test_results.json)"
         echo "Test results:"
-        printf '%s\\n' "$RESULTS" | jq '.'
+        printf '%s\n' "$RESULTS" | jq '.'
 
-        CLONE_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.clone_success // false')
-        INSTALL_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.install_success // false')
-        TEST_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.test_success // false')
-        COMPLEXITY_SCORE=$(printf '%s\\n' "$RESULTS" | jq -r '.setup_complexity_score // 0')
-        EXECUTION_TIME=$(printf '%s\\n' "$RESULTS" | jq -r '.execution_time_seconds // 0')
+        CLONE_SUCCESS=$(printf '%s\n' "$RESULTS" | jq -r '.clone_success // false')
+        INSTALL_SUCCESS=$(printf '%s\n' "$RESULTS" | jq -r '.install_success // false')
+        TEST_SUCCESS=$(printf '%s\n' "$RESULTS" | jq -r '.test_success // false')
+        COMPLEXITY_SCORE=$(printf '%s\n' "$RESULTS" | jq -r '.setup_complexity_score // 0')
+        EXECUTION_TIME=$(printf '%s\n' "$RESULTS" | jq -r '.execution_time_seconds // 0')
 
         echo "Clone success: $CLONE_SUCCESS"
         echo "Install success: $INSTALL_SUCCESS"
