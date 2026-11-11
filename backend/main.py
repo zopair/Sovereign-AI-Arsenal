@@ -67,15 +67,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=configured_cors_origins(),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
-)
-
-
 @app.middleware("http")
 async def enforce_api_key(request: Request, call_next):
     """Protect data and operational endpoints; health remains available to probes."""
@@ -103,6 +94,16 @@ async def add_process_time_header(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Process-Time"] = str(time.perf_counter() - start_time)
     return response
+
+
+# Register CORS last so it wraps authentication responses and handles preflight.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=configured_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+)
 
 
 @app.exception_handler(Exception)
