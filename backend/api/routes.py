@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 
-from ..database.db import get_db
+from ..database.db import get_db, db as database
 from ..database.models import Repository, Classification, Trend
 from ..core.discovery import GitHubDiscoveryEngine
 from ..core.evaluator import RepositoryEvaluator
@@ -206,7 +206,6 @@ async def discover_repositories(
             queries,
             max_repos_per_query,
             auto_analyze,
-            db
         )
         
         return {"message": "Repository discovery started", "status": "processing"}
@@ -233,7 +232,6 @@ async def analyze_repository(
             perform_comprehensive_analysis,
             str(repository.id),
             force_reanalyze,
-            db
         )
         
         return {"message": "Repository analysis started", "status": "processing"}
@@ -457,190 +455,162 @@ async def discover_and_analyze_repositories(
     queries: Optional[List[str]],
     max_repos_per_query: int,
     auto_analyze: bool,
-    db: Session
 ):
-    """Background task to discover and analyze repositories"""
+    """Discover repositories; each unit of DB work owns a short-lived session."""
     try:
-        # Discover repositories
         repositories = await discovery_engine.discover_ai_repositories(queries, max_repos_per_query)
-        
-        # Save to database
-        evaluator = get_evaluator()
-        classifier = get_classifier()
-        scorer = get_scorer()
-        vector_store = get_vector_store()
-        
+
         for repo_data in repositories:
             try:
-                # Check if repository already exists
-                existing_repo = db.query(Repository).filter(
-                    Repository.github_id == repo_data['id']
-                ).first()
-                
-                if existing_repo:
-                    # Update existing repository
-                    existing_repo.stargazers_count = repo_data.get('stargazers_count', existing_repo.stargazers_count)
-                    existing_repo.forks_count = repo_data.get('forks_count', existing_repo.forks_count)
-                    existing_repo.open_issues_count = repo_data.get('open_issues_count', existing_repo.open_issues_count)
-                    existing_repo.updated_at = datetime.fromisoformat(repo_data['updated_at'].replace('Z', '+00:00'))
-                    existing_repo.pushed_at = datetime.fromisoformat(repo_data['pushed_at'].replace('Z', '+00:00'))
-                    existing_repo.topics = repo_data.get('topics', [])
-                    repository = existing_repo
-                else:
-                    # Create new repository
-                    repository = Repository(
-                        github_id=repo_data['id'],
-                        name=repo_data['name'],
-                        full_name=repo_data['full_name'],
-                        description=repo_data.get('description'),
-                        html_url=repo_data['html_url'],
-                        clone_url=repo_data.get('clone_url'),
-                        language=repo_data.get('language'),
-                        size=repo_data.get('size'),
-                        stargazers_count=repo_data.get('stargazers_count', 0),
-                        forks_count=repo_data.get('forks_count', 0),
-                        open_issues_count=repo_data.get('open_issues_count', 0),
-                        watchers_count=repo_data.get('watchers_count', 0),
-                        subscribers_count=repo_data.get('subscribers_count', 0),
-                        license=repo_data.get('license'),
-                        is_fork=repo_data.get('fork', False),
-                        is_archived=repo_data.get('archived', False),
-                        created_at=datetime.fromisoformat(repo_data['created_at'].replace('Z', '+00:00')),
-                        updated_at=datetime.fromisoformat(repo_data['updated_at'].replace('Z', '+00:00')),
-                        pushed_at=datetime.fromisoformat(repo_data['pushed_at'].replace('Z', '+00:00')),
-                        default_branch=repo_data.get('default_branch'),
-                        topics=repo_data.get('topics', [])
-                    )
-                    db.add(repository)
-                    db.flush()
-                
-                if auto_analyze:
-                    # Perform analysis
-                    await perform_comprehensive_analysis(str(repository.id), False, db)
-                
-            except Exception as e:
-                logger.error(f"Error processing repository {repo_data.get('full_name', 'unknown')}: {e}")
-                continue
-        
-        db.commit()
-        logger.info(f"Processed {len(repositories)} repositories")
-        
-    except Exception as e:
-        logger.error(f"Error in discover_and_analyze_repositories: {e}")
-        db.rollback()
+                with database.get_session() as session:
+                    repository = session.query(Repository).filter(
+                        Repository.github_id == repo_data["id"]
+                    ).first()
 
-async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool, db: Session):
-    """Background task to perform comprehensive repository analysis"""
+                    if repository:
+                        repository.stargazers_count = repo_data.get("stargazers_count", repository.stargazers_count)
+                        repository.forks_count = repo_data.get("forks_count", repository.forks_count)
+                        repository.open_issues_count = repo_data.get("open_issues_count", repository.open_issues_count)
+                        repository.updated_at = datetime.fromisoformat(repo_data["updated_at"].replace("Z", "+00:00"))
+                        repository.pushed_at = datetime.fromisoformat(repo_data["pushed_at"].replace("Z", "+00:00"))
+                        repository.topics = repo_data.get("topics", [])
+                    else:
+                        repository = Repository(
+                            github_id=repo_data["id"],
+                            name=repo_data["name"],
+                            full_name=repo_data["full_name"],
+                            description=repo_data.get("description"),
+                            html_url=repo_data["html_url"],
+                            clone_url=repo_data.get("clone_url"),
+                            language=repo_data.get("language"),
+                            size=repo_data.get("size"),
+                            stargazers_count=repo_data.get("stargazers_count", 0),
+                            forks_count=repo_data.get("forks_count", 0),
+                            open_issues_count=repo_data.get("open_issues_count", 0),
+                            watchers_count=repo_data.get("watchers_count", 0),
+                            subscribers_count=repo_data.get("subscribers_count", 0),
+                            license=repo_data.get("license"),
+                            is_fork=repo_data.get("fork", False),
+                            is_archived=repo_data.get("archived", False),
+                            created_at=datetime.fromisoformat(repo_data["created_at"].replace("Z", "+00:00")),
+                            updated_at=datetime.fromisoformat(repo_data["updated_at"].replace("Z", "+00:00")),
+                            pushed_at=datetime.fromisoformat(repo_data["pushed_at"].replace("Z", "+00:00")),
+                            default_branch=repo_data.get("default_branch"),
+                            topics=repo_data.get("topics", []),
+                        )
+                        session.add(repository)
+                        session.flush()
+
+                    repository_id = str(repository.id)
+                    session.commit()
+
+                if auto_analyze:
+                    await perform_comprehensive_analysis(repository_id, False)
+
+            except Exception:
+                logger.exception("Error processing discovered repository %s", repo_data.get("full_name", "unknown"))
+                continue
+
+        logger.info("Processed %s discovered repositories", len(repositories))
+
+    except Exception:
+        logger.exception("Repository discovery background task failed")
+
+async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
+    """Analyze a repository without retaining a DB session during network/model work."""
     try:
-        repository = db.query(Repository).filter(Repository.id == repo_id).first()
-        if not repository:
-            return
-        
-        # Check if analysis is needed
-        if not force_reanalyze and repository.last_analyzed:
-            time_since_last_analysis = (datetime.utcnow() - repository.last_analyzed).days
-            if time_since_last_analysis < 1:  # Don't analyze more than once per day
+        with database.get_session() as session:
+            repository = session.query(Repository).filter(Repository.id == repo_id).first()
+            if not repository:
                 return
-        
-        # Get fresh data from GitHub
+
+            if not force_reanalyze and repository.last_analyzed:
+                if (datetime.utcnow() - repository.last_analyzed).days < 1:
+                    return
+
+            repository_snapshot = {
+                "id": repository.github_id,
+                "name": repository.name,
+                "full_name": repository.full_name,
+                "description": repository.description,
+                "language": repository.language,
+                "stargazers_count": repository.stargazers_count,
+                "forks_count": repository.forks_count,
+                "open_issues_count": repository.open_issues_count,
+                "topics": repository.topics,
+                "license": repository.license,
+                "created_at": repository.created_at.isoformat(),
+                "updated_at": repository.updated_at.isoformat(),
+            }
+
         discovery_engine = get_discovery_engine()
-        repo_metrics = await discovery_engine.update_repository_metrics(repository)
-        
-        # Prepare repo data for analysis
-        repo_data = {
-            'id': repository.github_id,
-            'name': repository.name,
-            'full_name': repository.full_name,
-            'description': repository.description,
-            'language': repository.language,
-            'stargazers_count': repository.stargazers_count,
-            'forks_count': repository.forks_count,
-            'open_issues_count': repository.open_issues_count,
-            'topics': repository.topics,
-            'license': repository.license,
-            'created_at': repository.created_at.isoformat(),
-            'updated_at': repository.updated_at.isoformat(),
-            'metrics': repo_metrics
-        }
-        
-        # Get README content
-        readme = await discovery_engine.get_repository_readme(repository.full_name)
+        repo_metrics = await discovery_engine.update_repository_metrics(repository_snapshot)
+        repo_data = {**repository_snapshot, "metrics": repo_metrics}
+
+        readme = await discovery_engine.get_repository_readme(repository_snapshot["full_name"])
         if readme:
-            repo_data['readme_content'] = readme
-        
-        # Perform evaluations
-        evaluator = get_evaluator()
-        evaluation = evaluator.evaluate_repository(repo_data, repo_metrics)
-        
-        # Perform classification
-        classifier = get_classifier()
-        classifications = classifier.classify_repository(repo_data)
-        
-        # Perform scoring
-        scorer = get_scorer()
-        scores = scorer.calculate_composite_score(repo_data, repo_metrics)
-        
-        # Perform trend analysis
-        trend_engine = get_trend_engine()
-        trend_analysis = trend_engine.analyze_repository_trends(repo_data)
-        
-        # Update repository with scores
-        repository.score = scores.get('overall_score', 0.0)
-        repository.trend_score = scores.get('trend_score', 0.0)
-        repository.ai_relevance_score = evaluation.get('ai_relevance_score', 0.0)
-        repository.last_analyzed = datetime.utcnow()
-        
-        # Save classifications
-        existing_classifications = db.query(Classification).filter(
-            Classification.repository_id == repo_id
-        ).all()
-        for existing in existing_classifications:
-            db.delete(existing)
-        
-        for classification_data in classifications:
-            classification = Classification(
-                repository_id=repo_id,
-                category=classification_data['category'],
-                subcategory=classification_data.get('subcategory'),
-                confidence=classification_data['confidence'],
-                tags=classification_data.get('tags'),
-                reasoning=classification_data.get('reasoning'),
-                model_version=classification_data.get('model_version')
-            )
-            db.add(classification)
-        
-        # Save trend data
-        if trend_analysis:
-            trend = Trend(
-                repository_id=repo_id,
-                date=datetime.utcnow(),
-                stars=repository.stargazers_count,
-                forks=repository.forks_count,
-                contributors=repo_metrics.get('contributors_count', 0),
-                commits=repo_metrics.get('commits_30_days', 0),
-                weekly_growth_rate=repo_metrics.get('weekly_growth_rate', 0.0),
-                trend_score=trend_analysis.get('trend_metrics', {}).get('trend_strength', 0.0)
-            )
-            db.add(trend)
-        
-        # Update vector embeddings
+            repo_data["readme_content"] = readme
+
+        evaluation = get_evaluator().evaluate_repository(repo_data, repo_metrics)
+        classifications = get_classifier().classify_repository(repo_data)
+        scores = get_scorer().calculate_composite_score(repo_data, repo_metrics)
+        trend_analysis = get_trend_engine().analyze_repository_trends(repo_data)
+
+        with database.get_session() as session:
+            repository = session.query(Repository).filter(Repository.id == repo_id).first()
+            if not repository:
+                return
+
+            repository.score = scores.get("overall_score", 0.0)
+            repository.trend_score = scores.get("trend_score", 0.0)
+            repository.ai_relevance_score = evaluation.get("ai_relevance_score", 0.0)
+            repository.last_analyzed = datetime.utcnow()
+
+            existing_classifications = session.query(Classification).filter(
+                Classification.repository_id == repo_id
+            ).all()
+            for existing in existing_classifications:
+                session.delete(existing)
+
+            for item in classifications:
+                session.add(Classification(
+                    repository_id=repo_id,
+                    category=item["category"],
+                    subcategory=item.get("subcategory"),
+                    confidence=item["confidence"],
+                    tags=item.get("tags"),
+                    reasoning=item.get("reasoning"),
+                    model_version=item.get("model_version"),
+                ))
+
+            if trend_analysis:
+                session.add(Trend(
+                    repository_id=repo_id,
+                    date=datetime.utcnow(),
+                    stars=repository.stargazers_count,
+                    forks=repository.forks_count,
+                    contributors=repo_metrics.get("contributors_count", 0),
+                    commits=repo_metrics.get("commits_30_days", 0),
+                    weekly_growth_rate=repo_metrics.get("weekly_growth_rate", 0.0),
+                    trend_score=trend_analysis.get("trend_metrics", {}).get("trend_strength", 0.0),
+                ))
+
+            session.commit()
+
         if readme:
-            vector_store = get_vector_store()
-            vector_store.add_repository_embedding(
+            get_vector_store().add_repository_embedding(
                 repo_id,
                 readme,
                 {
-                    'name': repository.name,
-                    'full_name': repository.full_name,
-                    'language': repository.language,
-                    'stars': repository.stargazers_count,
-                    'updated_at': repository.updated_at.isoformat()
-                }
+                    "name": repository_snapshot["name"],
+                    "full_name": repository_snapshot["full_name"],
+                    "language": repository_snapshot["language"],
+                    "stars": repository_snapshot["stargazers_count"],
+                    "updated_at": repository_snapshot["updated_at"],
+                },
             )
-        
-        db.commit()
-        logger.info(f"Completed analysis for repository {repository.full_name}")
-        
-    except Exception as e:
-        logger.error(f"Error in perform_comprehensive_analysis: {e}")
-        db.rollback()
+
+        logger.info("Completed analysis for repository %s", repository_snapshot["full_name"])
+
+    except Exception:
+        logger.exception("Repository analysis background task failed for %s", repo_id)
