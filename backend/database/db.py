@@ -23,7 +23,7 @@ class DatabaseConfig:
 
     def _load_config(self):
         try:
-            with open("config.yaml", "r", encoding="utf-8") as file:
+            with (os.path.dirname(__file__) and __import__("pathlib").Path(__file__).resolve().parents[1] / "config.yaml").open("r", encoding="utf-8") as file:
                 return yaml.safe_load(file) or {}
         except FileNotFoundError:
             logger.warning("config.yaml not found, using environment variables")
