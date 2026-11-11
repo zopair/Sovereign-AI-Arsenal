@@ -72,7 +72,7 @@ app.add_middleware(
     allow_origins=configured_cors_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 
 
@@ -80,7 +80,7 @@ app.add_middleware(
 async def enforce_api_key(request: Request, call_next):
     """Protect data and operational endpoints; health remains available to probes."""
     protected = request.url.path.startswith("/api/") or request.url.path == "/metrics"
-    if protected:
+    if protected and request.method != "OPTIONS":
         expected_key = os.getenv("API_AUTH_TOKEN")
         provided_key = request.headers.get("X-API-Key")
         if not expected_key:
