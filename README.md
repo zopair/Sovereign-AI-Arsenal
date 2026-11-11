@@ -88,6 +88,7 @@ python -m alembic upgrade head
 ```bash
 cp ../.env.example ../.env
 # Set DB_PASSWORD and GRAFANA_ADMIN_PASSWORD; keep real secrets out of Git
+set -a && source ../.env && set +a
 ```
 
 5. **Start the application**
