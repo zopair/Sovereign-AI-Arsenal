@@ -2,6 +2,7 @@ import os
 import yaml
 from contextlib import contextmanager
 from typing import Iterator
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -23,7 +24,7 @@ class DatabaseConfig:
 
     def _load_config(self):
         try:
-            with (os.path.dirname(__file__) and __import__("pathlib").Path(__file__).resolve().parents[1] / "config.yaml").open("r", encoding="utf-8") as file:
+            with (Path(__file__).resolve().parents[1] / "config.yaml").open("r", encoding="utf-8") as file:
                 return yaml.safe_load(file) or {}
         except FileNotFoundError:
             logger.warning("config.yaml not found, using environment variables")
