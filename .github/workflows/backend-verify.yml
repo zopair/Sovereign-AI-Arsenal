@@ -42,6 +42,7 @@ jobs:
           python -m pytest -q
           backend/tests/test_api_module_regressions.py
           backend/tests/test_security_and_background_tasks.py
+          backend/tests/test_vector_store_compatibility.py
   container-build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
