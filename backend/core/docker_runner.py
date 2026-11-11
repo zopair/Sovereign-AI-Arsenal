@@ -372,6 +372,10 @@ class DockerSandboxManager:
                     volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
                     mem_limit=self.memory_limit,
                     nano_cpus=int(float(self.cpu_limit) * 1_000_000_000),
+                        environment={
+                            'PYTHONDONTWRITEBYTECODE': '1',
+                            'PYTEST_ADDOPTS': '-p no:cacheprovider',
+                        },
                     security_opt=['no-new-privileges'],
                     read_only=False,  # Need write access for pip cache
                     detach=True
@@ -457,6 +461,10 @@ class DockerSandboxManager:
                         volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
                         mem_limit=self.memory_limit,
                         nano_cpus=int(float(self.cpu_limit) * 1_000_000_000),
+                        environment={
+                            'PYTHONDONTWRITEBYTECODE': '1',
+                            'PYTEST_ADDOPTS': '-p no:cacheprovider',
+                        },
                         security_opt=['no-new-privileges'],
                         detach=True
                     )
