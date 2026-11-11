@@ -235,3 +235,37 @@ def test_git_clone_uses_python_timeout_not_unsupported_git_option():
         for call in wait_for_calls
         for keyword in call.keywords
     )
+
+
+def test_sandbox_docker_cpu_limit_uses_supported_nano_cpus_argument():
+    runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
+    tree = ast.parse(runner_path.read_text(encoding="utf-8"))
+    create_calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "create"
+        and isinstance(node.func.value, ast.Attribute)
+        and node.func.value.attr == "containers"
+    ]
+
+    assert len(create_calls) == 2
+    for call in create_calls:
+        keyword_names = {keyword.arg for keyword in call.keywords}
+        assert "nano_cpus" in keyword_names
+        assert "cpu_limit" not in keyword_names
+
+
+def test_sandbox_test_container_installs_pytest_before_invoking_it():
+    runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
+    source = runner_path.read_text(encoding="utf-8")
+    assert "python -m pip install --disable-pip-version-check pytest" in source
+
+
+def test_sandbox_workflow_rejects_installation_and_test_failures():
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows" / "sandbox-test.yml").read_text(encoding="utf-8")
+    assert 'INSTALL_SUCCESS=$(echo' in workflow
+    assert 'TEST_SUCCESS=$(echo' in workflow
+    assert 'if [ "$INSTALL_SUCCESS" = "false" ]' in workflow
+    assert 'if [ "$TEST_SUCCESS" = "false" ]' in workflow
