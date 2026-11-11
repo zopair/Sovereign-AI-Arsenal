@@ -148,70 +148,49 @@ jobs:
         set -o pipefail
         python test_sandbox.py 2>&1 | tee sandbox_test.log
         
-        # Extract results
-        if grep -q "SANDBOX_TEST_RESULTS:" sandbox_test.log; then
-          RESULTS=$(grep "SANDBOX_TEST_RESULTS:" sandbox_test.log | sed 's/SANDBOX_TEST_RESULTS://')
-          echo "results<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESULTS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        fi
-        
-        if grep -q "SANDBOX_TEST_ERROR:" sandbox_test.log; then
-          ERROR=$(grep "SANDBOX_TEST_ERROR:" sandbox_test.log | sed 's/SANDBOX_TEST_ERROR://')
-          echo "error<<EOF" >> $GITHUB_OUTPUT
-          echo "$ERROR" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        fi
-
     - name: Validate test results
-      env:
-        RESULTS: ${{ steps.test.outputs.results }}
       run: |
-        if [ -n "$RESULTS" ]; then
-          echo "Test results:"
-          printf '%s\\n' "$RESULTS" | jq '.'
-          
-          # Validate key metrics
-          CLONE_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.clone_success // false')
-          INSTALL_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.install_success // false')
-          TEST_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.test_success // false')
-          COMPLEXITY_SCORE=$(printf '%s\\n' "$RESULTS" | jq -r '.setup_complexity_score // 0')
-          EXECUTION_TIME=$(printf '%s\\n' "$RESULTS" | jq -r '.execution_time_seconds // 0')
-          
-          echo "Clone success: $CLONE_SUCCESS"
-          echo "Complexity score: $COMPLEXITY_SCORE"
-          echo "Execution time: $EXECUTION_TIME seconds"
-          
-          # Basic assertions
-          if [ "$CLONE_SUCCESS" = "false" ]; then
-            echo "❌ Clone failed for ${{ matrix.test_repo.name }}"
-            exit 1
-          fi
-
-          if [ "$INSTALL_SUCCESS" = "false" ]; then
-            echo "❌ Dependency installation failed for ${{ matrix.test_repo.name }}"
-            exit 1
-          fi
-
-          if [ "$TEST_SUCCESS" = "false" ]; then
-            echo "❌ Tests failed for ${{ matrix.test_repo.name }}"
-            exit 1
-          fi
-          
-          if (( $(echo "$COMPLEXITY_SCORE < 0" | bc -l) )); then
-            echo "❌ Invalid complexity score: $COMPLEXITY_SCORE"
-            exit 1
-          fi
-          
-          if (( $(echo "$EXECUTION_TIME > 180" | bc -l) )); then
-            echo "⚠️ Long execution time: $EXECUTION_TIME seconds"
-          fi
-          
-          echo "✅ Sandbox test passed for ${{ matrix.test_repo.name }}"
-        else
-          echo "❌ No test results found"
+        if [ ! -s /tmp/sandbox_test_results.json ]; then
+          echo "No test results found"
           exit 1
         fi
+
+        RESULTS="$(cat /tmp/sandbox_test_results.json)"
+        echo "Test results:"
+        printf '%s\\n' "$RESULTS" | jq '.'
+
+        CLONE_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.clone_success // false')
+        INSTALL_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.install_success // false')
+        TEST_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.test_success // false')
+        COMPLEXITY_SCORE=$(printf '%s\\n' "$RESULTS" | jq -r '.setup_complexity_score // 0')
+        EXECUTION_TIME=$(printf '%s\\n' "$RESULTS" | jq -r '.execution_time_seconds // 0')
+
+        echo "Clone success: $CLONE_SUCCESS"
+        echo "Install success: $INSTALL_SUCCESS"
+        echo "Test success: $TEST_SUCCESS"
+        echo "Complexity score: $COMPLEXITY_SCORE"
+        echo "Execution time: $EXECUTION_TIME seconds"
+
+        if [ "$CLONE_SUCCESS" = "false" ]; then
+          echo "Clone failed for ${{ matrix.test_repo.name }}"
+          exit 1
+        fi
+        if [ "$INSTALL_SUCCESS" = "false" ]; then
+          echo "Dependency installation failed for ${{ matrix.test_repo.name }}"
+          exit 1
+        fi
+        if [ "$TEST_SUCCESS" = "false" ]; then
+          echo "Tests failed for ${{ matrix.test_repo.name }}"
+          exit 1
+        fi
+        if (( $(echo "$COMPLEXITY_SCORE < 0" | bc -l) )); then
+          echo "Invalid complexity score: $COMPLEXITY_SCORE"
+          exit 1
+        fi
+        if (( $(echo "$EXECUTION_TIME > 180" | bc -l) )); then
+          echo "Long execution time: $EXECUTION_TIME seconds"
+        fi
+        echo "Sandbox test passed for ${{ matrix.test_repo.name }}"
 
     - name: Upload test artifacts
       if: always()

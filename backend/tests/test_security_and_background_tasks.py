@@ -194,8 +194,8 @@ def test_sandbox_workflow_uses_supported_artifacts_and_exposes_test_outputs():
 
     assert "uses: actions/upload-artifact@v4" in workflow
     assert "actions/upload-artifact@v3" not in workflow
-    assert "      id: test" in workflow
-    assert "steps.test.outputs.results" in workflow
+    assert 'RESULTS="$(cat /tmp/sandbox_test_results.json)"' in workflow
+    assert "steps.test.outputs.results" not in workflow
 
 
 def test_cryptography_pin_is_a_published_release():
@@ -265,8 +265,8 @@ def test_sandbox_test_container_installs_pytest_before_invoking_it():
 def test_sandbox_workflow_rejects_installation_and_test_failures():
     root = Path(__file__).resolve().parents[2]
     workflow = (root / ".github" / "workflows" / "sandbox-test.yml").read_text(encoding="utf-8")
-    assert 'INSTALL_SUCCESS=$(echo' in workflow
-    assert 'TEST_SUCCESS=$(echo' in workflow
+    assert 'INSTALL_SUCCESS=$(printf' in workflow
+    assert 'TEST_SUCCESS=$(printf' in workflow
     assert 'if [ "$INSTALL_SUCCESS" = "false" ]' in workflow
     assert 'if [ "$TEST_SUCCESS" = "false" ]' in workflow
 
@@ -348,3 +348,11 @@ def test_statistics_route_uses_sqlalchemy_func_not_session_func():
         and node.value.id == "db"
         for node in ast.walk(function)
     )
+
+
+def test_sandbox_test_container_bootstraps_project_and_declared_test_dependencies():
+    runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
+    source = runner_path.read_text(encoding="utf-8")
+    assert "python -m pip install -e ." in source
+    assert "python -m pip install --group tests" in source
+    assert "python -m pip install --disable-pip-version-check --upgrade pip" in source

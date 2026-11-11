@@ -450,10 +450,16 @@ class DockerSandboxManager:
             container = None
             try:
                 for cmd in test_commands:
-                    test_command = [
-                        'sh', '-lc',
-                        'python -m pip install --disable-pip-version-check pytest && ' + ' '.join(cmd),
-                    ]
+                    test_bootstrap = (
+                        'python -m pip install --disable-pip-version-check --upgrade pip && '
+                        'python -m pip install --disable-pip-version-check pytest && '
+                        'if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; '
+                        'elif [ -f setup.py ] || [ -f pyproject.toml ]; then python -m pip install -e .; fi && '
+                        'if [ -f pyproject.toml ] && grep -q "^\\\\[dependency-groups\\\\]" pyproject.toml '
+                        '&& grep -q "^tests = \\\\[" pyproject.toml; then '
+                        'python -m pip install --group tests; fi && '
+                    )
+                    test_command = ['sh', '-lc', test_bootstrap + ' '.join(cmd)]
                     container = self.docker_client.containers.create(
                         image=self.image_name,
                         command=test_command,
