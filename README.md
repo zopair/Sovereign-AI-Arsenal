@@ -41,8 +41,8 @@ cd sovereign-ai-arsenal
 2. **Configure environment variables**
 ```bash
 cp .env.example .env
-# Generate two different secrets with: openssl rand -hex 32
-# Put one in DB_PASSWORD and the other in GRAFANA_ADMIN_PASSWORD, then save the file
+# Generate three different secrets with: openssl rand -hex 32
+# Set POSTGRES_ADMIN_PASSWORD, DB_PASSWORD, and GRAFANA_ADMIN_PASSWORD
 ```
 
 3. **Start the platform**
@@ -90,7 +90,7 @@ python -m alembic upgrade head
 4. **Configure environment**
 ```bash
 cp ../.env.example ../.env
-# Set DB_PASSWORD and GRAFANA_ADMIN_PASSWORD; keep real secrets out of Git
+# Set POSTGRES_ADMIN_PASSWORD, DB_PASSWORD, and GRAFANA_ADMIN_PASSWORD; keep secrets out of Git
 set -a && source ../.env && set +a
 ```
 
@@ -109,7 +109,8 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=sovereign_ai_arsenal
 DB_USER=app_user
-DB_PASSWORD=<unique-random-secret>
+DB_PASSWORD=<unique-app-database-secret>
+POSTGRES_ADMIN_PASSWORD=<unique-postgres-admin-secret>
 
 # Redis
 REDIS_HOST=localhost
@@ -129,7 +130,7 @@ DEBUG=false
 
 ### Configuration File (config.yaml)
 
-The platform uses `config.yaml` for detailed configuration:
+The platform uses config.yaml for non-secret defaults. Database credentials are supplied only through environment variables. The Compose bootstrap creates a separate, non-superuser app_user role for the API.
 
 ```yaml
 app_name: "Sovereign AI Arsenal"
@@ -140,7 +141,7 @@ database:
   port: 5432
   name: sovereign_ai_arsenal
   user: app_user
-  # Supply DB_PASSWORD through the environment; never commit credentials.
+  # DB_PASSWORD is supplied through the environment; never commit credentials.
   pool_size: 10
   max_overflow: 20
 
@@ -391,7 +392,7 @@ alembic upgrade head
 3. **Application Deployment**
 ```bash
 # Build and deploy with Docker
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # Or manual deployment
 uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
@@ -461,3 +462,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Built with ❤️ by the Sovereign AI Arsenal team**
+
+### Existing database volumes
+
+The role-bootstrap script runs only when PostgreSQL initializes an empty data volume. If this stack has already been started with an older volume, **do not delete the volume** to apply the new role model. Back up the database and perform a reviewed role/password migration against the existing instance first.
