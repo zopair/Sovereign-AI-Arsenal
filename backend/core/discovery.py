@@ -282,42 +282,41 @@ class GitHubDiscoveryEngine:
                                       repository: Repository) -> Dict[str, Any]:
         """Update repository metrics with fresh data"""
         try:
-            async with self:
-                # Get fresh repository data
-                repo_data = await self.get_repository_details(repository.full_name)
-                
-                # Get recent commits
-                since = datetime.utcnow() - timedelta(days=30)
-                commits = await self.get_repository_commits(repository.full_name, since)
-                
-                # Get contributors
-                contributors = await self.get_repository_contributors(repository.full_name)
-                
-                # Calculate metrics
-                metrics = {
-                    'stars': repo_data.get('stargazers_count', 0),
-                    'forks': repo_data.get('forks_count', 0),
-                    'open_issues': repo_data.get('open_issues_count', 0),
-                    'contributors_count': len(contributors),
-                    'commits_30_days': len(commits),
-                    'last_commit_date': None,
-                    'commit_frequency': 0.0,
-                    'contributor_activity': 0.0
-                }
-                
-                # Calculate commit frequency
-                if commits:
-                    last_commit = datetime.fromisoformat(commits[0]['commit']['committer']['date'].replace('Z', '+00:00'))
-                    metrics['last_commit_date'] = last_commit
-                    metrics['commit_frequency'] = len(commits) / 30.0  # commits per day
-                
-                # Calculate contributor activity
-                if contributors:
-                    active_contributors = sum(1 for c in contributors if c.get('contributions', 0) > 0)
-                    metrics['contributor_activity'] = active_contributors / len(contributors)
-                
-                return metrics
-                
+            # Get fresh repository data
+            repo_data = await self.get_repository_details(repository.full_name)
+            
+            # Get recent commits
+            since = datetime.utcnow() - timedelta(days=30)
+            commits = await self.get_repository_commits(repository.full_name, since)
+            
+            # Get contributors
+            contributors = await self.get_repository_contributors(repository.full_name)
+            
+            # Calculate metrics
+            metrics = {
+                'stars': repo_data.get('stargazers_count', 0),
+                'forks': repo_data.get('forks_count', 0),
+                'open_issues': repo_data.get('open_issues_count', 0),
+                'contributors_count': len(contributors),
+                'commits_30_days': len(commits),
+                'last_commit_date': None,
+                'commit_frequency': 0.0,
+                'contributor_activity': 0.0
+            }
+            
+            # Calculate commit frequency
+            if commits:
+                last_commit = datetime.fromisoformat(commits[0]['commit']['committer']['date'].replace('Z', '+00:00'))
+                metrics['last_commit_date'] = last_commit
+                metrics['commit_frequency'] = len(commits) / 30.0  # commits per day
+            
+            # Calculate contributor activity
+            if contributors:
+                active_contributors = sum(1 for c in contributors if c.get('contributions', 0) > 0)
+                metrics['contributor_activity'] = active_contributors / len(contributors)
+            
+            return metrics
+            
         except Exception as e:
             logger.error(f"Failed to update repository metrics: {e}")
             return {}
