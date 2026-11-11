@@ -45,3 +45,13 @@ def test_compose_publishes_stateful_admin_ports_only_on_loopback():
     assert compose["services"]["redis"]["ports"] == ["127.0.0.1:${REDIS_PORT:-6379}:6379"]
     assert compose["services"]["grafana"]["ports"] == ["127.0.0.1:${GRAFANA_PORT:-3000}:3000"]
     assert compose["services"]["prometheus"]["ports"] == ["127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"]
+
+def test_app_config_disables_wildcard_cors_by_default():
+    config = yaml.safe_load((ROOT / "backend" / "config.yaml").read_text())
+    assert config["api"]["cors_origins"] == []
+    assert "*" not in config["api"]["cors_origins"]
+
+
+def test_app_config_has_no_committed_database_password():
+    config = yaml.safe_load((ROOT / "backend" / "config.yaml").read_text())
+    assert "password" not in config["database"]
