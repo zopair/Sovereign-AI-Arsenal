@@ -269,3 +269,27 @@ def test_sandbox_workflow_rejects_installation_and_test_failures():
     assert 'TEST_SUCCESS=$(echo' in workflow
     assert 'if [ "$INSTALL_SUCCESS" = "false" ]' in workflow
     assert 'if [ "$TEST_SUCCESS" = "false" ]' in workflow
+
+
+def test_sandbox_pulls_missing_base_image_before_container_creation():
+    runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
+    tree = ast.parse(runner_path.read_text(encoding="utf-8"))
+    method = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "_initialize_docker"
+    )
+
+    image_calls = {
+        node.func.attr for node in ast.walk(method)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Attribute)
+        and node.func.value.attr == "images"
+    }
+    assert "get" in image_calls
+    assert "pull" in image_calls
+    assert any(
+        isinstance(node, ast.Attribute) and node.attr == "ImageNotFound"
+        for node in ast.walk(method)
+    )
