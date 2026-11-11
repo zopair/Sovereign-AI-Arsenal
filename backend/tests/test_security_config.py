@@ -33,7 +33,11 @@ def test_compose_does_not_enable_trust_authentication_or_default_passwords():
     postgres = compose["services"]["postgres"]
 
     assert "POSTGRES_HOST_AUTH_METHOD" not in postgres.get("environment", {})
-    assert "${DB_PASSWORD:?DB_PASSWORD must be set}" in postgres["environment"]["POSTGRES_PASSWORD"]
+    assert "${POSTGRES_ADMIN_PASSWORD:?POSTGRES_ADMIN_PASSWORD must be set}" in postgres["environment"]["POSTGRES_PASSWORD"]
+    assert postgres["environment"]["POSTGRES_USER"] == "postgres"
+    assert postgres["environment"]["APP_DB_USER"] == "app_user"
+    assert "${DB_PASSWORD:?DB_PASSWORD must be set}" in postgres["environment"]["APP_DB_PASSWORD"]
+    assert compose["services"]["backend"]["environment"]["DB_USER"] == "app_user"
     assert postgres["environment"]["POSTGRES_DB"] == "sovereign_ai_arsenal"
 
 
