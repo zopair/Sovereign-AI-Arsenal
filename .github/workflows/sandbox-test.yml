@@ -11,10 +11,22 @@ on:
     paths:
       - 'backend/core/docker_runner.py'
       - 'backend/requirements.txt'
+      - '.github/workflows/sandbox-test.yml'
   workflow_dispatch:
 
 jobs:
+  validate-workflow:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate workflow YAML
+        run: ruby -e "require 'yaml'; YAML.load_file('.github/workflows/sandbox-test.yml')"
+
   sandbox-test:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     
