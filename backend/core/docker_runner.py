@@ -170,7 +170,6 @@ class DockerSandboxManager:
                 'git', 'clone',
                 '--depth', '1',  # Shallow clone for speed
                 '--single-branch',
-                '--timeout', '60',
                 clone_url,
                 str(workspace_path / repo_name)
             ]
