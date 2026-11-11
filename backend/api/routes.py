@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import logging
+from pathlib import Path
 from datetime import datetime
 
 from ..database.db import get_db
@@ -15,13 +16,14 @@ from ..core.llm_analyzer import LLMAnalyzer
 from ..database.vector_store import get_vector_store
 
 logger = logging.getLogger(__name__)
+CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
 
 router = APIRouter(prefix="/api/v1", tags=["repositories"])
 
 # Initialize core components
 def get_discovery_engine():
     import yaml
-    with open('config.yaml', 'r') as file:
+    with CONFIG_PATH.open('r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
     return GitHubDiscoveryEngine(config.get('github', {}))
 
