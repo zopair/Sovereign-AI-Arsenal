@@ -41,8 +41,8 @@ cd sovereign-ai-arsenal
 2. **Configure environment variables**
 ```bash
 cp .env.example .env
-# Generate three different secrets with: openssl rand -hex 32
-# Set POSTGRES_ADMIN_PASSWORD, DB_PASSWORD, and GRAFANA_ADMIN_PASSWORD
+# Generate four different secrets with: openssl rand -hex 32
+# Set POSTGRES_ADMIN_PASSWORD, DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, and API_AUTH_TOKEN
 ```
 
 3. **Start the platform**
@@ -51,7 +51,7 @@ docker compose up -d
 ```
 
 4. **Access the services**
-- API: http://localhost:8000
+- API: http://localhost:8000 (send the X-API-Key header on /api/* and /metrics)
 - API Documentation: http://localhost:8000/docs
 - Grafana Dashboard: http://localhost:3000 (admin; password from GRAFANA_ADMIN_PASSWORD)
 - PostgreSQL: localhost:5432 (local development access only)
@@ -344,11 +344,7 @@ Configure alerts in Prometheus for:
 
 ### Authentication
 
-Authentication is not yet enforced at the API boundary. Do not expose the API publicly until authentication and authorization are implemented and tested. The following mechanisms are planned, not currently verified:
-
-- API Keys (for programmatic access)
-- JWT Tokens (for web applications)
-- OAuth2 (for third-party integrations)
+The API enforces a shared API key on `/api/*` and `/metrics` using the `X-API-Key` header. Configure a unique `API_AUTH_TOKEN` secret before startup. If the secret is missing, protected routes fail closed with HTTP 503; missing or incorrect keys receive HTTP 401. `/health` remains unauthenticated for container health checks. This is a single shared-token gate, not user identity, role-based authorization, tenant isolation, or OAuth. Keep host bindings loopback-only and do not expose the service publicly until a full identity and authorization model is implemented and independently reviewed.
 
 ### Rate Limiting
 
