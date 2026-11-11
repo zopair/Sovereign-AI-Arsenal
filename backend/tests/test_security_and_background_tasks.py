@@ -66,6 +66,7 @@ def test_compose_requires_api_auth_token_before_startup():
     compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
     example = (root / ".env.example").read_text(encoding="utf-8")
 
+    assert '${API_AUTH_TOKEN:?...}' not in compose
     assert '${API_AUTH_TOKEN:?API_AUTH_TOKEN must be set}' in compose
     assert "API_AUTH_TOKEN=" in example
 
@@ -144,3 +145,33 @@ def test_metrics_method_does_not_close_a_caller_owned_discovery_session():
         and node.name == "update_repository_metrics"
     )
     assert not any(isinstance(node, ast.AsyncWith) for node in ast.walk(method))
+
+
+def test_runtime_requirements_exclude_python_asyncio_backport_and_colab_notebook_stack():
+    requirements = (
+        Path(__file__).resolve().parents[1] / "requirements.txt"
+    ).read_text(encoding="utf-8").lower()
+
+    forbidden = (
+        "asyncio==",
+        "google-colab",
+        "jupyter",
+        "ipywidgets",
+        "pytest",
+        "pytest-asyncio",
+        "black==",
+        "isort==",
+        "flake8==",
+        "mypy==",
+    )
+    for package in forbidden:
+        assert package not in requirements, f"unexpected runtime dependency: {package}"
+
+
+def test_transformer_stack_pins_compatible_hub_api():
+    requirements = (
+        Path(__file__).resolve().parents[1] / "requirements.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "transformers==4.39.3" in requirements
+    assert "huggingface-hub==0.25.2" in requirements
