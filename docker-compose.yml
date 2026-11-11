@@ -48,6 +48,7 @@ services:
       DB_NAME: sovereign_ai_arsenal
       DB_USER: app_user
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      API_AUTH_TOKEN: ${API_AUTH_TOKEN:?API_AUTH_TOKEN must be set}
       REDIS_URL: redis://redis:6379/0
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
