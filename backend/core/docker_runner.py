@@ -62,8 +62,17 @@ class DockerSandboxManager:
         """Initialize Docker client"""
         try:
             self.docker_client = docker.from_env()
-            # Test connection
+            # Test daemon connectivity before attempting any image operations.
             self.docker_client.ping()
+
+            # Ensure the configured execution image exists locally.
+            try:
+                self.docker_client.images.get(self.image_name)
+                logger.info("Sandbox image already available: %s", self.image_name)
+            except docker.errors.ImageNotFound:
+                logger.info("Pulling missing sandbox image: %s", self.image_name)
+                self.docker_client.images.pull(self.image_name)
+
             logger.info("Docker client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Docker client: {e}")
