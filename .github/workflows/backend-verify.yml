@@ -1,0 +1,48 @@
+name: Backend security and build gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "docker-compose.yml"
+      - ".env.example"
+      - ".github/workflows/backend-verify.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "docker-compose.yml"
+      - ".env.example"
+      - ".github/workflows/backend-verify.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install focused test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run security and route regression tests
+        env:
+          PYTHONPATH: .
+        run: >-
+          python -m pytest -q
+          backend/tests/test_api_module_regressions.py
+          backend/tests/test_security_and_background_tasks.py
+  container-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build --pull -t sovereign-ai-arsenal-backend:ci -f backend/Dockerfile backend
