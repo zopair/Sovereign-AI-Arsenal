@@ -175,3 +175,14 @@ def test_transformer_stack_pins_compatible_hub_api():
 
     assert "transformers==4.39.3" in requirements
     assert "huggingface-hub==0.25.2" in requirements
+
+
+def test_github_token_scope_validation_is_async_for_aiohttp_context():
+    security_path = Path(__file__).resolve().parents[1] / "core" / "security.py"
+    tree = ast.parse(security_path.read_text(encoding="utf-8"))
+    method = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "validate_github_token_scope"
+    )
+    assert isinstance(method, ast.AsyncFunctionDef)
