@@ -44,6 +44,21 @@ jobs:
           backend/tests/test_security_and_background_tasks.py
   container-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: sovereign_ai_smoke
+          POSTGRES_USER: app_user
+          POSTGRES_PASSWORD: smoke-db-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app_user -d sovereign_ai_smoke"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -54,6 +69,59 @@ jobs:
           context: backend
           file: backend/Dockerfile
           push: false
+          load: true
           tags: sovereign-ai-arsenal-backend:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Start backend against disposable PostgreSQL
+        run: |
+          docker run -d --name backend-smoke --network host \
+            -e DB_HOST=127.0.0.1 \
+            -e DB_PORT=5432 \
+            -e DB_NAME=sovereign_ai_smoke \
+            -e DB_USER=app_user \
+            -e DB_PASSWORD=smoke-db-password \
+            -e API_AUTH_TOKEN=smoke-test-key \
+            -e LOG_DIR=/tmp/sovereign-backend-smoke-logs \
+            sovereign-ai-arsenal-backend:ci
+      - name: Verify health and API authentication
+        run: |
+          healthy=false
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8000/health -o /tmp/backend-health.json; then
+              healthy=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "$healthy" != "true" ]; then
+            echo "Backend did not become healthy"
+            docker logs backend-smoke || true
+            exit 1
+          fi
+
+          unauth_status=$(curl -sS -o /tmp/backend-unauth.json -w "%{http_code}" \
+            http://127.0.0.1:8000/api/v1/statistics)
+          if [ "$unauth_status" != "401" ]; then
+            echo "Expected unauthenticated API request to return 401, got $unauth_status"
+            cat /tmp/backend-unauth.json || true
+            exit 1
+          fi
+
+          auth_status=$(curl -sS -o /tmp/backend-auth.json -w "%{http_code}" \
+            -H "X-API-Key: smoke-test-key" \
+            http://127.0.0.1:8000/api/v1/statistics)
+          if [ "$auth_status" != "200" ]; then
+            echo "Expected authenticated statistics request to return 200, got $auth_status"
+            cat /tmp/backend-auth.json || true
+            docker logs backend-smoke || true
+            exit 1
+          fi
+          cat /tmp/backend-health.json
+          cat /tmp/backend-auth.json
+      - name: Print backend logs on failure
+        if: failure()
+        run: docker logs backend-smoke || true
+      - name: Remove smoke container
+        if: always()
+        run: docker rm -f backend-smoke || true
