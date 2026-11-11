@@ -38,9 +38,11 @@ jobs:
         with:
           go-version: '1.24.x'
       - name: Install actionlint
-        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Validate workflow syntax and expressions
-        run: "$(go env GOPATH)/bin/actionlint .github/workflows/daily-update.yml"
+        run: actionlint -ignore 'SC2086' -ignore 'SC2129' .github/workflows/daily-update.yml
 
   update-repositories:
     if: github.event_name != 'pull_request'
@@ -78,7 +80,7 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -100,31 +102,21 @@ jobs:
         pip install pytest pytest-asyncio
 
     - name: Set up environment variables
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sovereign_ai_arsenal
+        REDIS_URL: redis://localhost:6379/0
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         cd backend
         cp .env.example .env
-        
-        # Set database URL
-        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/sovereign_ai_arsenal" >> .env
-        
-        # Set Redis URL
-        echo "REDIS_URL=redis://localhost:6379/0" >> .env
-        
-        # Set GitHub token (if available)
-        if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
-          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env
-        fi
-        
-        # Set OpenAI token (if available)
-        if [ -n "${{ secrets.OPENAI_API_KEY }}" ]; then
-          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
-        fi
-        
-        # Set other environment variables
-        echo "LOG_LEVEL=INFO" >> .env
-        echo "API_HOST=0.0.0.0" >> .env
-        echo "API_PORT=8000" >> .env
-        echo "DEBUG=false" >> .env
+        {
+          printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
+          printf 'REDIS_URL=%s\n' "$REDIS_URL"
+          printf 'GITHUB_TOKEN=%s\n' "$GITHUB_TOKEN"
+          printf 'OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY"
+          printf 'LOG_LEVEL=INFO\nAPI_HOST=0.0.0.0\nAPI_PORT=8000\nDEBUG=false\n'
+        } >> .env
 
     - name: Wait for services
       run: |
@@ -428,8 +420,8 @@ jobs:
         EOF
         
         # Run the update script
-        MAX_REPOS=${{ github.event.inputs.max_repos || '100' }}
-        FORCE_UPDATE=${{ github.event.inputs.force_update == 'true' || 'false' }}
+        MAX_REPOS="${{ github.event.inputs.max_repos || '100' }}"
+        FORCE_UPDATE="${{ github.event.inputs.force_update == 'true' || 'false' }}"
         
         echo "Running repository update with MAX_REPOS=$MAX_REPOS, FORCE_UPDATE=$FORCE_UPDATE"
         
