@@ -322,3 +322,29 @@ def test_sandbox_containers_disable_host_owned_python_and_pytest_caches():
         }
         assert environment_values.get("PYTHONDONTWRITEBYTECODE") == "1"
         assert "-p no:cacheprovider" in environment_values.get("PYTEST_ADDOPTS", "")
+
+
+def test_statistics_route_uses_sqlalchemy_func_not_session_func():
+    routes_path = Path(__file__).resolve().parents[1] / "api" / "routes.py"
+    tree = ast.parse(routes_path.read_text(encoding="utf-8"))
+    function = next(
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "get_statistics"
+    )
+
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "sum"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "func"
+        for node in ast.walk(function)
+    )
+    assert not any(
+        isinstance(node, ast.Attribute)
+        and node.attr == "func"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "db"
+        for node in ast.walk(function)
+    )
