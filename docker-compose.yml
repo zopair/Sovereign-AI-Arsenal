@@ -59,8 +59,8 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./backend/logs:/app/logs
-      - ./backend/data:/app/data
+      - ./backend/logs:/app/backend/logs
+      - ./backend/data:/app/backend/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
