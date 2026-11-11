@@ -46,3 +46,8 @@ prompt
 backend/.env
 backend/.env.*
 !backend/.env.example
+
+# Local runtime databases; keep sanitized fixtures in a dedicated test directory.
+*.db
+*.sqlite
+*.sqlite3
