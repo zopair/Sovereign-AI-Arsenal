@@ -204,3 +204,34 @@ def test_cryptography_pin_is_a_published_release():
     ).read_text(encoding="utf-8")
     assert "cryptography==41.0.7" in requirements
     assert "cryptography==41.0.8" not in requirements
+
+
+def test_git_clone_uses_python_timeout_not_unsupported_git_option():
+    runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
+    tree = ast.parse(runner_path.read_text(encoding="utf-8"))
+    method = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "_clone_repository"
+    )
+
+    string_literals = {
+        node.value for node in ast.walk(method)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    assert "--timeout" not in string_literals
+
+    wait_for_calls = [
+        node for node in ast.walk(method)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "wait_for"
+    ]
+    assert wait_for_calls
+    assert any(
+        keyword.arg == "timeout"
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value == 120
+        for call in wait_for_calls
+        for keyword in call.keywords
+    )
