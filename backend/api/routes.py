@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import logging
@@ -413,8 +414,8 @@ async def get_statistics(db: Session = Depends(get_db)):
     """Get platform statistics"""
     try:
         total_repos = db.query(Repository).count()
-        total_stars = db.query(db.func.sum(Repository.stargazers_count)).scalar() or 0
-        total_forks = db.query(db.func.sum(Repository.forks_count)).scalar() or 0
+        total_stars = db.query(func.sum(Repository.stargazers_count)).scalar() or 0
+        total_forks = db.query(func.sum(Repository.forks_count)).scalar() or 0
         
         # Language distribution
         languages = db.query(
