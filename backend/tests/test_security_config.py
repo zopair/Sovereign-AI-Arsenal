@@ -42,7 +42,7 @@ def test_compose_publishes_stateful_admin_ports_only_on_loopback():
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
 
     assert compose["services"]["postgres"]["ports"] == ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
-    assert compose["services"]["redis"]["ports"] == ["127.0.0.1:${REDIS_PORT:-6379}:6379"]
+    assert "ports" not in compose["services"]["redis"]
     assert compose["services"]["grafana"]["ports"] == ["127.0.0.1:${GRAFANA_PORT:-3000}:3000"]
     assert compose["services"]["prometheus"]["ports"] == ["127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"]
 
