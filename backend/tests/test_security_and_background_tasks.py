@@ -107,3 +107,40 @@ def test_analysis_passes_attribute_based_repository_snapshot_to_discovery():
     assert isinstance(metric_call.args[0], ast.Call)
     assert isinstance(metric_call.args[0].func, ast.Name)
     assert metric_call.args[0].func.id == "SimpleNamespace"
+
+
+def test_analysis_keeps_one_discovery_client_open_for_metrics_and_readme():
+    routes_path = Path(__file__).resolve().parents[1] / "api" / "routes.py"
+    tree = ast.parse(routes_path.read_text(encoding="utf-8"))
+    worker = next(
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "perform_comprehensive_analysis"
+    )
+
+    client_context = next(
+        node for node in ast.walk(worker)
+        if isinstance(node, ast.AsyncWith)
+        and any(
+            isinstance(item.context_expr, ast.Name)
+            and item.context_expr.id == "discovery_engine"
+            for item in node.items
+        )
+    )
+    called_methods = {
+        item.func.attr for item in ast.walk(client_context)
+        if isinstance(item, ast.Call) and isinstance(item.func, ast.Attribute)
+    }
+    assert "update_repository_metrics" in called_methods
+    assert "get_repository_readme" in called_methods
+
+
+def test_metrics_method_does_not_close_a_caller_owned_discovery_session():
+    discovery_path = Path(__file__).resolve().parents[1] / "core" / "discovery.py"
+    tree = ast.parse(discovery_path.read_text(encoding="utf-8"))
+    method = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "update_repository_metrics"
+    )
+    assert not any(isinstance(node, ast.AsyncWith) for node in ast.walk(method))
