@@ -90,7 +90,7 @@ python -m alembic upgrade head
 4. **Configure environment**
 ```bash
 cp ../.env.example ../.env
-# Set POSTGRES_ADMIN_PASSWORD, DB_PASSWORD, and GRAFANA_ADMIN_PASSWORD; keep secrets out of Git
+# Set POSTGRES_ADMIN_PASSWORD, DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, and API_AUTH_TOKEN; keep secrets out of Git
 set -a && source ../.env && set +a
 ```
 
@@ -191,6 +191,12 @@ scoring:
 - `GET /metrics` - Application metrics
 
 ### Example API Usage
+
+All `/api/*` endpoints require the configured API key:
+
+```bash
+curl -H "X-API-Key: $API_AUTH_TOKEN" "http://127.0.0.1:8000/api/v1/statistics"
+```
 
 ```python
 import httpx
