@@ -5,15 +5,18 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_DB: sovereign_ai_arsenal
-      POSTGRES_USER: app_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?POSTGRES_ADMIN_PASSWORD must be set}
+      APP_DB_USER: app_user
+      APP_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./init/00-create-app-user.sh:/docker-entrypoint-initdb.d/00-create-app-user.sh:ro
+      - ./init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app_user -d sovereign_ai_arsenal"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sovereign_ai_arsenal"]
       interval: 10s
       timeout: 5s
       retries: 5
