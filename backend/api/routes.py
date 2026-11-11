@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 from datetime import datetime, timedelta
 
 from ..database.db import get_db, db as database
@@ -544,7 +545,7 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
             }
 
         discovery_engine = get_discovery_engine()
-        repo_metrics = await discovery_engine.update_repository_metrics(repository_snapshot)
+        repo_metrics = await discovery_engine.update_repository_metrics(SimpleNamespace(**repository_snapshot))
         repo_data = {**repository_snapshot, "metrics": repo_metrics}
 
         readme = await discovery_engine.get_repository_readme(repository_snapshot["full_name"])
