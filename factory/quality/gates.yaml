@@ -1,0 +1,28 @@
+version: 1
+gates:
+  all:
+    - compile
+    - unit_tests
+    - security_scan
+    - provenance
+  web:
+    - browser_smoke
+    - visual_regression
+    - accessibility
+  mobile:
+    - apk_build
+    - apk_install
+    - launch_smoke
+    - navigation_smoke
+    - screenshot_capture
+  api:
+    - integration_tests
+    - database_connectivity
+  release:
+    - license_compliance
+    - secret_scan
+    - artifact_integrity
+thresholds:
+  minimum_quality_score: 90
+  critical_gates_must_pass: true
+release_rule: never_claim_success_without_evidence

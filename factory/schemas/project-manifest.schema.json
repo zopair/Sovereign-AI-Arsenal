@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI Application Factory Project Manifest",
+  "type": "object",
+  "required": ["project", "requirements", "constraints", "quality"],
+  "properties": {
+    "project": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": {"type": "string"},
+        "type": {"enum": ["web", "api", "mobile", "ai-agent", "fullstack", "data", "other"]},
+        "platforms": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "ai": {"type": "array", "items": {"type": "string"}},
+        "database": {"type": "string"},
+        "auth": {"type": "string"},
+        "automation": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "open_source_first": {"type": "boolean"},
+        "self_hostable": {"type": "boolean"},
+        "offline_capable": {"type": "boolean"},
+        "budget": {"type": "number"},
+        "target_devices": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "minimum_score": {"type": "number", "minimum": 0, "maximum": 100},
+        "required_gates": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

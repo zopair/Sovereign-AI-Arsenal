@@ -1,0 +1,111 @@
+name: Factory Intake
+
+on:
+  push:
+    branches: ["factory-v1"]
+    paths:
+      - "factory/**"
+      - ".github/workflows/factory-intake.yml"
+      - "factory/benchmarks/**"
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "GitHub repository to inspect (owner/name)"
+        required: true
+        type: string
+      save_report:
+        description: "Persist the generated intake report"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factory-intake-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  self-test:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout factory
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Runner diagnostics
+        run: |
+          set -euxo pipefail
+          echo "runner=${RUNNER_NAME}"
+          echo "os=${RUNNER_OS}"
+          echo "arch=${RUNNER_ARCH}"
+          python --version
+          python -m pip --version
+          git --version
+          df -h
+      - name: Compile factory
+        run: python -m compileall -q factory
+      - name: Run factory self-test
+        run: python -m factory.selftest
+      - name: Run recovery contract tests
+        run: python -m factory.test_recovery
+      - name: Run execution broker tests
+        run: python -m factory.execution.test_runner_broker
+      - name: Run runtime tests
+        run: python -m factory.runtime.test_runtime
+      - name: Run runtime smoke
+        run: python -m factory.runtime.runtime_smoke
+      - name: Validate benchmark records
+        run: |
+          test -f factory/benchmarks/clt_platform/BASELINE.md
+          test -f factory/benchmarks/clt_platform/RECOVERY_PLAN.md
+          test -f factory/benchmarks/clt_platform/repository_index.json
+
+  intake:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout factory
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Runner diagnostics
+        run: |
+          set -euxo pipefail
+          echo "runner=${RUNNER_NAME}"
+          echo "os=${RUNNER_OS}"
+          echo "arch=${RUNNER_ARCH}"
+          python --version
+          git --version
+      - name: Run intake manager
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p factory/reports
+          python -m factory.manager "${{ inputs.repository }}" | tee "factory/reports/intake.json"
+      - name: Upload intake report
+        if: ${{ inputs.save_report }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-intake-${{ github.run_number }}
+          path: factory/reports/intake.json

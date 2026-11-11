@@ -1,0 +1,30 @@
+version: 1
+principles:
+  - least_privilege
+  - explicit_capabilities
+  - auditable_execution
+  - reversible_changes
+roles:
+  intake:
+    allow: [repo.read, registry.read]
+  architect:
+    allow: [repo.read, registry.read, plan.write]
+  builder:
+    allow: [repo.read, repo.write, branch.create, test.run]
+  tester:
+    allow: [repo.read, test.run, artifact.read]
+  security:
+    allow: [repo.read, dependency.scan, secret.scan]
+  release:
+    allow: [repo.read, artifact.read, release.prepare]
+    require_approval: true
+  production:
+    allow: [artifact.read, deploy]
+    require_approval: true
+secrets:
+  storage: runtime_only
+  persistence: forbidden
+  logging: forbidden
+network:
+  default: deny
+  allowlist_required: true

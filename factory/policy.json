@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "default_mode": "open_first",
+  "rules": [
+    {"id":"license-check","severity":"high","action":"block_on_unknown_license_for_direct_inclusion"},
+    {"id":"provider-neutrality","severity":"high","action":"require_adapter_for_ai_provider"},
+    {"id":"secrets","severity":"critical","action":"never_commit_tokens_or_private_keys"},
+    {"id":"runtime-verification","severity":"high","action":"require_runtime_check_before_release"},
+    {"id":"mobile-release","severity":"high","action":"require_install_launch_navigation_and_api_smoke_test"},
+    {"id":"agent-tools","severity":"high","action":"scope_tool_permissions_and_record_side_effects"},
+    {"id":"reproducibility","severity":"medium","action":"prefer_lockfiles_and_pinned_build_inputs"}
+  ]
+}
