@@ -13,6 +13,7 @@ from sqlalchemy import text
 from .database.db import init_database
 from .database.vector_store import init_vector_store
 from .api.routes import router as api_router
+from .security import api_key_is_valid
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -73,6 +74,27 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def enforce_api_key(request: Request, call_next):
+    """Protect data and operational endpoints; health remains available to probes."""
+    protected = request.url.path.startswith("/api/") or request.url.path == "/metrics"
+    if protected:
+        expected_key = os.getenv("API_AUTH_TOKEN")
+        provided_key = request.headers.get("X-API-Key")
+        if not expected_key:
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "API authentication is not configured"},
+            )
+        if not api_key_is_valid(provided_key, expected_key):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+    return await call_next(request)
 
 
 @app.middleware("http")
