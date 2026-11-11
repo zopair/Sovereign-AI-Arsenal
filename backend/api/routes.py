@@ -29,31 +29,31 @@ def get_discovery_engine():
 
 def get_evaluator():
     import yaml
-    with open('config.yaml', 'r') as file:
+    with CONFIG_PATH.open('r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
     return RepositoryEvaluator(config)
 
 def get_classifier():
     import yaml
-    with open('config.yaml', 'r') as file:
+    with CONFIG_PATH.open('r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
     return RepositoryClassifier(config)
 
 def get_scorer():
     import yaml
-    with open('config.yaml', 'r') as file:
+    with CONFIG_PATH.open('r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
     return RepositoryScorer(config)
 
 def get_trend_engine():
     import yaml
-    with open('config.yaml', 'r') as file:
+    with CONFIG_PATH.open('r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
     return TrendAnalysisEngine(config)
 
 def get_llm_analyzer():
     import yaml
-    with open('config.yaml', 'r') as file:
+    with CONFIG_PATH.open('r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
     return LLMAnalyzer(config)
 
