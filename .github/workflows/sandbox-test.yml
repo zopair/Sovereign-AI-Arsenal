@@ -144,7 +144,8 @@ jobs:
             asyncio.run(test_sandbox())
         EOF
         
-        # Run the test
+        # Preserve the Python test exit code through tee.
+        set -o pipefail
         python test_sandbox.py 2>&1 | tee sandbox_test.log
         
         # Extract results
@@ -163,17 +164,19 @@ jobs:
         fi
 
     - name: Validate test results
+      env:
+        RESULTS: ${{ steps.test.outputs.results }}
       run: |
-        if [ -n "${{ steps.test.outputs.results }}" ]; then
+        if [ -n "$RESULTS" ]; then
           echo "Test results:"
-          echo '${{ steps.test.outputs.results }}' | jq '.'
+          printf '%s\\n' "$RESULTS" | jq '.'
           
           # Validate key metrics
-          CLONE_SUCCESS=$(echo '${{ steps.test.outputs.results }}' | jq -r '.clone_success // false')
-          INSTALL_SUCCESS=$(echo '${{ steps.test.outputs.results }}' | jq -r '.install_success // false')
-          TEST_SUCCESS=$(echo '${{ steps.test.outputs.results }}' | jq -r '.test_success // false')
-          COMPLEXITY_SCORE=$(echo '${{ steps.test.outputs.results }}' | jq -r '.setup_complexity_score // 0')
-          EXECUTION_TIME=$(echo '${{ steps.test.outputs.results }}' | jq -r '.execution_time_seconds // 0')
+          CLONE_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.clone_success // false')
+          INSTALL_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.install_success // false')
+          TEST_SUCCESS=$(printf '%s\\n' "$RESULTS" | jq -r '.test_success // false')
+          COMPLEXITY_SCORE=$(printf '%s\\n' "$RESULTS" | jq -r '.setup_complexity_score // 0')
+          EXECUTION_TIME=$(printf '%s\\n' "$RESULTS" | jq -r '.execution_time_seconds // 0')
           
           echo "Clone success: $CLONE_SUCCESS"
           echo "Complexity score: $COMPLEXITY_SCORE"
