@@ -1,6 +1,6 @@
 app_name: "Sovereign AI Arsenal"
 version: "1.0.0"
-description: "Production-grade AI intelligence platform for discovering and analyzing AI repositories"
+description: "Modular AI intelligence platform for discovering and analyzing AI repositories"
 
 database:
   host: localhost
