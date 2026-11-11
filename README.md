@@ -111,6 +111,7 @@ DB_NAME=sovereign_ai_arsenal
 DB_USER=app_user
 DB_PASSWORD=<unique-app-database-secret>
 POSTGRES_ADMIN_PASSWORD=<unique-postgres-admin-secret>
+API_AUTH_TOKEN=<unique-api-access-secret>
 
 # Redis
 REDIS_HOST=localhost
