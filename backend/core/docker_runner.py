@@ -362,7 +362,7 @@ class DockerSandboxManager:
                     working_dir='/app',
                     volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
                     mem_limit=self.memory_limit,
-                    cpu_limit=float(self.cpu_limit),
+                    nano_cpus=int(float(self.cpu_limit) * 1_000_000_000),
                     security_opt=['no-new-privileges'],
                     read_only=False,  # Need write access for pip cache
                     detach=True
@@ -437,13 +437,17 @@ class DockerSandboxManager:
             container = None
             try:
                 for cmd in test_commands:
+                    test_command = [
+                        'sh', '-lc',
+                        'python -m pip install --disable-pip-version-check pytest && ' + ' '.join(cmd),
+                    ]
                     container = self.docker_client.containers.create(
                         image=self.image_name,
-                        command=cmd,
+                        command=test_command,
                         working_dir='/app',
                         volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
                         mem_limit=self.memory_limit,
-                        cpu_limit=float(self.cpu_limit),
+                        nano_cpus=int(float(self.cpu_limit) * 1_000_000_000),
                         security_opt=['no-new-privileges'],
                         detach=True
                     )
