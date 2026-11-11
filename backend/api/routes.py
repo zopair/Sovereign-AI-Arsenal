@@ -545,10 +545,11 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
             }
 
         discovery_engine = get_discovery_engine()
-        repo_metrics = await discovery_engine.update_repository_metrics(SimpleNamespace(**repository_snapshot))
-        repo_data = {**repository_snapshot, "metrics": repo_metrics}
+        async with discovery_engine:
+            repo_metrics = await discovery_engine.update_repository_metrics(SimpleNamespace(**repository_snapshot))
+            readme = await discovery_engine.get_repository_readme(repository_snapshot["full_name"])
 
-        readme = await discovery_engine.get_repository_readme(repository_snapshot["full_name"])
+        repo_data = {**repository_snapshot, "metrics": repo_metrics}
         if readme:
             repo_data["readme_content"] = readme
 
