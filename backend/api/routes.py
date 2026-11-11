@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ..database.db import get_db
 from ..database.models import Repository, Classification, Trend
