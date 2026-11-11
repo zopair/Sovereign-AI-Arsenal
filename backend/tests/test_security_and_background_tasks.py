@@ -293,3 +293,32 @@ def test_sandbox_pulls_missing_base_image_before_container_creation():
         isinstance(node, ast.Attribute) and node.attr == "ImageNotFound"
         for node in ast.walk(method)
     )
+
+
+def test_sandbox_containers_disable_host_owned_python_and_pytest_caches():
+    runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
+    tree = ast.parse(runner_path.read_text(encoding="utf-8"))
+    create_calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "create"
+        and isinstance(node.func.value, ast.Attribute)
+        and node.func.value.attr == "containers"
+    ]
+
+    assert len(create_calls) == 2
+    for call in create_calls:
+        environment = next(
+            keyword.value for keyword in call.keywords
+            if keyword.arg == "environment"
+        )
+        assert isinstance(environment, ast.Dict)
+        environment_values = {
+            key.value: value.value
+            for key, value in zip(environment.keys, environment.values)
+            if isinstance(key, ast.Constant)
+            and isinstance(value, ast.Constant)
+        }
+        assert environment_values.get("PYTHONDONTWRITEBYTECODE") == "1"
+        assert "-p no:cacheprovider" in environment_values.get("PYTEST_ADDOPTS", "")
