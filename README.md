@@ -40,19 +40,19 @@ cd sovereign-ai-arsenal
 
 2. **Configure environment variables**
 ```bash
-cp backend/.env.example backend/.env
-# Edit backend/.env with your configuration
+cp .env.example .env
+# Replace both placeholder secrets with unique random values before startup
 ```
 
 3. **Start the platform**
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 4. **Access the services**
 - API: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
-- Grafana Dashboard: http://localhost:3000 (admin/admin)
+- Grafana Dashboard: http://localhost:3000 (admin; password from GRAFANA_ADMIN_PASSWORD)
 - Prometheus: http://localhost:9090
 
 ### Manual Installation
@@ -86,13 +86,13 @@ python -m alembic upgrade head
 
 4. **Configure environment**
 ```bash
-cp .env.example .env
-# Edit .env with your settings
+cp ../.env.example ../.env
+# Set DB_PASSWORD and GRAFANA_ADMIN_PASSWORD; keep real secrets out of Git
 ```
 
 5. **Start the application**
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd .. && PYTHONPATH=. uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 ## ⚙️ Configuration
@@ -101,12 +101,11 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 # Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/sovereign_ai_arsenal
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=sovereign_ai_arsenal
-DB_USER=postgres
-DB_PASSWORD=password
+DB_USER=app_user
+DB_PASSWORD=<unique-random-secret>
 
 # Redis
 REDIS_HOST=localhost
@@ -136,8 +135,8 @@ database:
   host: localhost
   port: 5432
   name: sovereign_ai_arsenal
-  user: postgres
-  password: password
+  user: app_user
+  # Supply DB_PASSWORD through the environment; never commit credentials.
   pool_size: 10
   max_overflow: 20
 
