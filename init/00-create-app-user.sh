@@ -13,7 +13,8 @@ psql \
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'app_user', :'app_password')
 WHERE NOT EXISTS (
     SELECT 1 FROM pg_roles WHERE rolname = :'app_user'
-) \gexec
+)
+\gexec
 
 GRANT CONNECT ON DATABASE sovereign_ai_arsenal TO :"app_user";
 GRANT USAGE, CREATE ON SCHEMA public TO :"app_user";
