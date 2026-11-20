@@ -95,6 +95,41 @@ def test_repository_path_policy_rejects_symlinks_and_paths_outside_checkout(tmp_
     assert not is_safe_repo_path(root, outside)
 
 
+def test_host_scanners_apply_the_checkout_boundary_before_reading_repository_files():
+    import ast
+    from pathlib import Path
+
+    runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
+    tree = ast.parse(runner_path.read_text(encoding="utf-8"))
+    protected_methods = {
+        "_analyze_file_structure",
+        "_security_scan",
+        "_collect_performance_metrics",
+        "_get_directory_size",
+    }
+
+    for method in (
+        node for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in protected_methods
+    ):
+        loops = [
+            node for node in ast.walk(method)
+            if isinstance(node, ast.For)
+            and isinstance(node.iter, ast.Call)
+            and isinstance(node.iter.func, ast.Attribute)
+            and node.iter.func.attr == "rglob"
+        ]
+        assert loops, f"{method.name} must inspect repository paths"
+        for loop in loops:
+            assert any(
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "is_safe_repo_path"
+                for node in ast.walk(loop)
+            ), f"{method.name} must reject symlinks and paths outside the checkout"
+
+
 def test_cleanup_filters_only_containers_owned_by_this_sandbox_manager():
     assert managed_container_filters() == {
         "label": [
