@@ -89,7 +89,7 @@ jobs:
       - name: Verify health and API authentication
         run: |
           healthy=false
-          for attempt in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             if curl -fsS http://127.0.0.1:8000/health -o /tmp/backend-health.json; then
               healthy=true
               break
