@@ -59,6 +59,12 @@ docker compose logs -f worker
 
 The worker service starts automatically with the API, PostgreSQL, and Redis. No separate Celery broker, paid queue service, or Cloudflare deployment is required.
 
+For local Python development, start Redis and run the worker from the repository root in a separate terminal:
+
+~~~bash
+REDIS_URL=redis://localhost:6379/0 PYTHONPATH=. celery -A backend.core.celery_app:celery_app worker --loglevel=INFO --concurrency=1 --queues=repository
+~~~
+
 ## Proof of Concept & Enterprise Customization Readiness
 
 **Status:** Working PoC queue integration; not an exactly-once workflow engine or multi-tenant job scheduler.
