@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from .sandbox_policy import (
     build_container_security_options,
     managed_container_filters,
+    require_gvisor_runtime,
     validate_clone_url,
 )
 
@@ -76,11 +77,7 @@ class DockerSandboxManager:
             # Test daemon connectivity before attempting any image operations.
             self.docker_client.ping()
             runtimes = self.docker_client.info().get('Runtimes', {})
-            if self.runtime != 'runsc' or self.runtime not in runtimes:
-                raise RuntimeError(
-                    'gVisor runsc runtime is required for untrusted repository execution; '
-                    'refusing to fall back to the default Docker runtime'
-                )
+            require_gvisor_runtime(runtimes, self.runtime)
 
             # Ensure the configured execution image exists locally.
             try:
