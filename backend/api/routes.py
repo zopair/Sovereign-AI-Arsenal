@@ -476,6 +476,8 @@ async def discover_and_analyze_repositories(
     """Discover repositories; each unit of DB work owns a short-lived session."""
     try:
         repositories = await discovery_engine.discover_ai_repositories(queries, max_repos_per_query)
+        processed_count = 0
+        failed_count = 0
 
         for repo_data in repositories:
             try:
@@ -524,11 +526,23 @@ async def discover_and_analyze_repositories(
                 if auto_analyze:
                     await perform_comprehensive_analysis(repository_id, False)
 
+                processed_count += 1
             except Exception:
+                failed_count += 1
                 logger.exception("Error processing discovered repository %s", repo_data.get("full_name", "unknown"))
                 continue
 
-        logger.info("Processed %s discovered repositories", len(repositories))
+        logger.info(
+            "Processed %s of %s discovered repositories; %s failed",
+            processed_count,
+            len(repositories),
+            failed_count,
+        )
+        return {
+            "discovered": len(repositories),
+            "processed": processed_count,
+            "failed": failed_count,
+        }
 
     except Exception:
         logger.exception("Repository discovery worker task failed")
