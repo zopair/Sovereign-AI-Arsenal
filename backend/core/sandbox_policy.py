@@ -69,7 +69,7 @@ def build_container_security_options(config: dict[str, Any] | None = None) -> di
         "nano_cpus": int(cpu_limit * 1_000_000_000),
         "user": "65532:65532",
         "tmpfs": {
-            "/tmp": "rw,noexec,nosuid,size=64m",
+            "/tmp": "rw,nosuid,nodev,size=256m",
             "/home/nonroot": "rw,nosuid,nodev,size=32m",
         },
         "environment": {
