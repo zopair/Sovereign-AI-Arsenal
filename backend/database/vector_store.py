@@ -5,6 +5,7 @@ import logging
 from sentence_transformers import SentenceTransformer
 import json
 import os
+from pathlib import Path
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -21,10 +22,14 @@ class VectorStore:
         """Initialize ChromaDB client and embedding model"""
         try:
             # Initialize ChromaDB
-            persist_directory = self.config.get('persist_directory', 'data/vectors')
-            os.makedirs(persist_directory, exist_ok=True)
-            
-            self.client = chromadb.PersistentClient(path=persist_directory)
+            persist_directory = Path(
+                self.config.get('persist_directory', 'data/vectors')
+            )
+            if not persist_directory.is_absolute():
+                persist_directory = Path(__file__).resolve().parents[1] / persist_directory
+            persist_directory.mkdir(parents=True, exist_ok=True)
+
+            self.client = chromadb.PersistentClient(path=str(persist_directory))
             collection_name = self.config.get('collection_name', 'ai_repositories')
             
             # ChromaDB's public API uses get_or_create_collection for
