@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
@@ -6,6 +6,9 @@ import logging
 from pathlib import Path
 from types import SimpleNamespace
 from datetime import datetime, timedelta
+import uuid
+
+from celery.result import AsyncResult
 
 from ..database.db import get_db, db as database
 from ..database.models import Repository, Classification, Trend
@@ -16,6 +19,8 @@ from ..core.scorer import RepositoryScorer
 from ..core.trend_engine import TrendAnalysisEngine
 from ..core.llm_analyzer import LLMAnalyzer
 from ..database.vector_store import get_vector_store
+from ..core.celery_app import celery_app
+from ..core.repository_tasks import analyze_repository_task, discover_repositories_task
 
 logger = logging.getLogger(__name__)
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
@@ -191,58 +196,68 @@ async def get_repository(repo_id: str, db: Session = Depends(get_db)):
 
 @router.post("/discover")
 async def discover_repositories(
-    background_tasks: BackgroundTasks,
     queries: Optional[List[str]] = Query(None),
     max_repos_per_query: int = Query(100, ge=1, le=500),
     auto_analyze: bool = Query(True),
-    db: Session = Depends(get_db)
 ):
-    """Discover new AI repositories"""
+    """Queue repository discovery for the dedicated worker process."""
     try:
-        discovery_engine = get_discovery_engine()
-        
-        # Start discovery in background
-        background_tasks.add_task(
-            discover_and_analyze_repositories,
-            discovery_engine,
-            queries,
-            max_repos_per_query,
-            auto_analyze,
+        task = discover_repositories_task.apply_async(
+            args=(queries or [], max_repos_per_query, auto_analyze),
+            queue="repository",
         )
-        
-        return {"message": "Repository discovery started", "status": "processing"}
-        
-    except Exception as e:
-        logger.error(f"Error starting repository discovery: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return {
+            "message": "Repository discovery queued",
+            "task_id": task.id,
+            "status": "queued",
+        }
+    except Exception:
+        logger.exception("Error queuing repository discovery")
+        raise HTTPException(status_code=503, detail="Repository worker is unavailable")
 
 @router.post("/repositories/{repo_id}/analyze")
 async def analyze_repository(
     repo_id: str,
-    background_tasks: BackgroundTasks,
     force_reanalyze: bool = Query(False),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Trigger comprehensive analysis of a repository"""
+    """Queue a repository analysis and return its task identifier."""
     try:
         repository = db.query(Repository).filter(Repository.id == repo_id).first()
         if not repository:
             raise HTTPException(status_code=404, detail="Repository not found")
-        
-        # Start analysis in background
-        background_tasks.add_task(
-            perform_comprehensive_analysis,
-            str(repository.id),
-            force_reanalyze,
+
+        task = analyze_repository_task.apply_async(
+            args=(str(repository.id), force_reanalyze),
+            queue="repository",
         )
-        
-        return {"message": "Repository analysis started", "status": "processing"}
-        
+        return {
+            "message": "Repository analysis queued",
+            "task_id": task.id,
+            "status": "queued",
+        }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error starting repository analysis: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    except Exception:
+        logger.exception("Error queuing repository analysis")
+        raise HTTPException(status_code=503, detail="Repository worker is unavailable")
+
+
+@router.get("/tasks/{task_id}")
+async def get_task_status(task_id: str):
+    """Return a bounded status view for a Celery task ID."""
+    try:
+        normalized_task_id = str(uuid.UUID(task_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid task identifier")
+
+    task = AsyncResult(normalized_task_id, app=celery_app)
+    response = {"task_id": normalized_task_id, "status": task.state.lower()}
+    if task.successful():
+        response["result"] = task.result
+    elif task.failed():
+        response["error"] = "Task failed; inspect worker logs for details"
+    return response
 
 @router.get("/search")
 async def search_repositories(
