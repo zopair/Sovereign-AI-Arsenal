@@ -26,6 +26,8 @@ class GitHubInspectorTests(unittest.TestCase):
         self.assertEqual(manager.repo_identity("https://github.com/acme/app/"), ("acme", "app"))
         with self.assertRaises(ValueError):
             manager.repo_identity("acme/app/tree/main")
+        with self.assertRaises(ValueError):
+            manager.repo_identity("../app")
 
     def test_github_get_retries_rate_limit_with_bounded_retry_after(self):
         headers = Message()
@@ -178,6 +180,24 @@ class GitHubInspectorTests(unittest.TestCase):
             (_ for _ in ()).throw(forbidden) if p.endswith("/readme") else base_get(p)
         )):
             with self.assertRaises(urllib.error.HTTPError):
+                manager.inspect("acme", "app")
+
+    def test_inspect_rejects_a_truncated_fallback_tree_instead_of_returning_partial_data(self):
+        def fake_get(path):
+            if path == "/repos/acme/app":
+                return {"default_branch": "main"}
+            if path == "/repos/acme/app/git/ref/heads/main":
+                return {"object": {"sha": "commit-sha"}}
+            if path == "/repos/acme/app/git/commits/commit-sha":
+                return {"tree": {"sha": "root-tree-sha"}}
+            if path == "/repos/acme/app/git/trees/root-tree-sha?recursive=1":
+                return {"sha": "root-tree-sha", "truncated": True, "tree": []}
+            if path == "/repos/acme/app/git/trees/root-tree-sha":
+                return {"truncated": True, "tree": [{"path": "partial.py", "type": "blob"}]}
+            raise AssertionError(path)
+
+        with patch.object(manager, "github_get", side_effect=fake_get):
+            with self.assertRaisesRegex(RuntimeError, "truncated directory"):
                 manager.inspect("acme", "app")
 
 
