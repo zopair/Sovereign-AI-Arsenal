@@ -80,8 +80,10 @@ jobs:
           persist-credentials: false
       - name: Validate Docker Compose configuration
         env:
+          POSTGRES_ADMIN_PASSWORD: ci-only-admin-password
           DB_PASSWORD: ci-only-password
           API_AUTH_TOKEN: ci-only-token
+          GRAFANA_ADMIN_PASSWORD: ci-only-grafana-password
         run: docker compose config --quiet
 
       - name: Set up Docker Buildx
