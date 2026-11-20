@@ -14,6 +14,10 @@ The repository analyzer separates static inspection from executing repository-co
 
 gVisor is an application kernel for containers, not a full virtual machine. Review its threat model and deployment guidance before using it for hostile multi-tenant workloads.
 
+## Integration status
+
+The Docker sandbox module is not currently wired to a public API route or a background worker. This change hardens its execution boundary but does not claim that repository test execution is live in the default Compose deployment. The durable worker integration is tracked separately; until a dedicated gVisor worker host is configured, use GitHub Actions for bounded repository CI tasks and keep the Docker sandbox disabled.
+
 ## Network policy
 
 Network access is disabled by default. When disabled, the analyzer performs static inspection and explicitly skips dependency installation and test execution.
