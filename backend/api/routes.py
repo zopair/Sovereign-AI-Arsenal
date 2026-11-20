@@ -554,11 +554,11 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
         with database.get_session() as session:
             repository = session.query(Repository).filter(Repository.id == repo_id).first()
             if not repository:
-                return
+                return {"repository_id": repo_id, "status": "not_found"}
 
             if not force_reanalyze and repository.last_analyzed:
                 if (datetime.utcnow() - repository.last_analyzed).days < 1:
-                    return
+                    return {"repository_id": repo_id, "status": "already_fresh"}
 
             repository_snapshot = {
                 "id": repository.github_id,
@@ -656,6 +656,7 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
             session.commit()
 
         logger.info("Completed analysis for repository %s", repository_snapshot["full_name"])
+        return {"repository_id": repo_id, "status": "completed"}
 
     except Exception:
         logger.exception("Repository analysis worker task failed for %s", repo_id)
