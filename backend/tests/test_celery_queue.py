@@ -98,6 +98,11 @@ def test_analysis_task_delegates_to_the_existing_analysis_pipeline(monkeypatch):
 
 
 def test_discovery_payload_validation_is_bounded_and_preserves_default_queries():
+    from backend.core.repository_tasks import (
+        InvalidTaskPayload,
+        _validate_discovery_payload,
+    )
+
     _validate_discovery_payload(None, 100, True)
     _validate_discovery_payload(["machine learning"], 50, False)
 
@@ -114,6 +119,11 @@ def test_discovery_payload_validation_is_bounded_and_preserves_default_queries()
 
 
 def test_analysis_payload_validation_requires_uuid_and_boolean_flag():
+    from backend.core.repository_tasks import (
+        InvalidTaskPayload,
+        _validate_analysis_payload,
+    )
+
     _validate_analysis_payload("d9428888-122b-4d1c-a3b1-50a3b4bffea9", False)
 
     with pytest.raises(InvalidTaskPayload):
@@ -123,7 +133,11 @@ def test_analysis_payload_validation_requires_uuid_and_boolean_flag():
 
 
 def test_invalid_task_payloads_are_excluded_from_automatic_retries():
-    from backend.core.repository_tasks import InvalidTaskPayload
+    from backend.core.repository_tasks import (
+        InvalidTaskPayload,
+        analyze_repository_task,
+        discover_repositories_task,
+    )
 
     assert InvalidTaskPayload in discover_repositories_task.dont_autoretry_for
     assert InvalidTaskPayload in analyze_repository_task.dont_autoretry_for
