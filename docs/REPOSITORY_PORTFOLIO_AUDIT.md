@@ -27,7 +27,7 @@
 
 ### A. Sovereign-AI-Arsenal — النواة التقنية الأساسية
 
-<badge>تم دمج محرك مزودي النماذج</badge>
+**الحالة: تم دمج محرك مزودي النماذج.**
 
 **ما تم التحقق منه:**
 - Backend مبني على FastAPI مع PostgreSQL وRedis وVector Store.
@@ -132,7 +132,7 @@
 
 ### E. SINC-OS — الخدمات أصبحت قابلة للبناء والاختبار
 
-<badge>تم دمج إصلاحات التشغيل والتنظيف</badge>
+**الحالة: تم دمج إصلاحات التشغيل والتنظيف.**
 
 **ما تم دمجه في PR #1:**
 - FastAPI Gateway وOrchestrator مع Dockerfiles منفصلة.
