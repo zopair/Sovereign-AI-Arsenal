@@ -73,6 +73,10 @@ def test_analysis_task_delegates_to_the_existing_analysis_pipeline(monkeypatch):
 
     fake_routes.perform_comprehensive_analysis = analyze
     monkeypatch.setitem(sys.modules, "backend.api.routes", fake_routes)
+    monkeypatch.setattr(
+        "backend.core.repository_tasks._ensure_vector_store",
+        lambda: None,
+    )
 
     assert analyze_repository_task.run("repo-123", True) == {
         "repository_id": "repo-123",
