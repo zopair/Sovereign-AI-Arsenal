@@ -362,6 +362,6 @@ def test_statistics_route_uses_sqlalchemy_func_not_session_func():
 def test_sandbox_test_container_bootstraps_project_and_declared_test_dependencies():
     runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
     source = runner_path.read_text(encoding="utf-8")
-    assert "python -m pip install --user ." in source
+    assert "'--user', '.'" in source
     assert "python -m pip install --user --group tests" in source
     assert "python -m pip install --user --disable-pip-version-check --upgrade pip" in source
