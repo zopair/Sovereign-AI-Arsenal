@@ -9,6 +9,7 @@ import tempfile
 import shutil
 import re
 import subprocess
+import shlex
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -359,14 +360,14 @@ class DockerSandboxManager:
             
             # Python requirements.txt
             if (repo_path / 'requirements.txt').exists():
-                install_cmd = ['pip', 'install', '-r', 'requirements.txt']
+                install_cmd = ['python', '-m', 'pip', 'install', '--user', '-r', 'requirements.txt']
                 async with aiofiles.open(repo_path / 'requirements.txt', 'r') as f:
                     content = await f.read()
                     dependencies = [line.strip() for line in content.split('\n') if line.strip() and not line.startswith('#')]
             
             # setup.py
             elif (repo_path / 'setup.py').exists():
-                install_cmd = ['pip', 'install', '-e', '.']
+                install_cmd = ['python', '-m', 'pip', 'install', '--user', '.']
                 # Try to extract dependencies from setup.py
                 try:
                     async with aiofiles.open(repo_path / 'setup.py', 'r') as f:
@@ -413,9 +414,13 @@ class DockerSandboxManager:
                 # Create container
                 container = self.docker_client.containers.create(
                     image=self.image_name,
-                    command=install_cmd,
-                    working_dir='/app',
-                    volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
+                    command=[
+                        'sh', '-lc',
+                        'mkdir -p /tmp/project && cp -a /app/. /tmp/project/ '
+                        '&& cd /tmp/project && exec ' + shlex.join(install_cmd),
+                    ],
+                    working_dir='/tmp',
+                    volumes={str(repo_path): {'bind': '/app', 'mode': 'ro'}},
                     detach=True,
                     **self._container_security_options(allow_network=True),
                 )
@@ -505,12 +510,16 @@ class DockerSandboxManager:
                         '&& grep -q "^tests = \\\\[" pyproject.toml; then '
                         'python -m pip install --user --group tests; fi && '
                     )
-                    test_command = ['sh', '-lc', test_bootstrap + ' '.join(cmd)]
+                    test_command = [
+                        'sh', '-lc',
+                        'mkdir -p /tmp/project && cp -a /app/. /tmp/project/ '
+                        '&& cd /tmp/project && ' + test_bootstrap + shlex.join(cmd),
+                    ]
                     container = self.docker_client.containers.create(
                         image=self.image_name,
                         command=test_command,
-                        working_dir='/app',
-                        volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
+                        working_dir='/tmp',
+                        volumes={str(repo_path): {'bind': '/app', 'mode': 'ro'}},
                         detach=True,
                         **self._container_security_options(allow_network=True),
                     )
@@ -663,10 +672,9 @@ class DockerSandboxManager:
             'allow_network_for_install': allow_network,
         })
 
-    @staticmethod
-    def _wait_for_container(container):
+    def _wait_for_container(self, container):
         try:
-            return container.wait(timeout=300)
+            return container.wait(timeout=self.timeout)
         except Exception:
             try:
                 container.stop(timeout=5)
