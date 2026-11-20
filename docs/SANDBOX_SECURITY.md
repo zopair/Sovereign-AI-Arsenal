@@ -8,6 +8,7 @@ The repository analyzer separates static inspection from executing repository-co
 - Dependency installation and test execution require Docker configured with the gVisor OCI runtime `runsc`.
 - The runner refuses to fall back to Docker's default `runc` runtime.
 - The source checkout is mounted read-only inside the container and copied into an ephemeral tmpfs workspace.
+- Host-side static scanners reject symlinks and any resolved path outside the temporary checkout, preventing repository-controlled links from exposing host files.
 - Containers run as an unprivileged UID, with all Linux capabilities dropped, `no-new-privileges`, a read-only root filesystem, PID/CPU/memory limits, and an application-owned label.
 - Cleanup only targets containers bearing the application and sandbox labels. It never prunes images or unrelated containers.
 
