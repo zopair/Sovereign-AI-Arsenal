@@ -430,16 +430,20 @@ jobs:
         # Extract results from log
         if grep -q "UPDATE_RESULTS:" update.log; then
             RESULTS=$(grep "UPDATE_RESULTS:" update.log | sed 's/UPDATE_RESULTS://')
-            echo "results<<EOF" >> $GITHUB_OUTPUT
-            echo "$RESULTS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            {
+              printf 'results<<EOF\n'
+              printf '%s\n' "$RESULTS"
+              printf 'EOF\n'
+            } >> "$GITHUB_OUTPUT"
         fi
         
         if grep -q "UPDATE_ERROR:" update.log; then
             ERROR=$(grep "UPDATE_ERROR:" update.log | sed 's/UPDATE_ERROR://')
-            echo "error<<EOF" >> $GITHUB_OUTPUT
-            echo "$ERROR" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            {
+              printf 'error<<EOF\n'
+              printf '%s\n' "$ERROR"
+              printf 'EOF\n'
+            } >> "$GITHUB_OUTPUT"
         fi
 
     - name: Generate summary report
