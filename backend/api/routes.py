@@ -531,7 +531,8 @@ async def discover_and_analyze_repositories(
         logger.info("Processed %s discovered repositories", len(repositories))
 
     except Exception:
-        logger.exception("Repository discovery background task failed")
+        logger.exception("Repository discovery worker task failed")
+        raise
 
 async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
     """Analyze a repository without retaining a DB session during network/model work."""
@@ -574,6 +575,24 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
         scores = get_scorer().calculate_composite_score(repo_data, repo_metrics)
         trend_analysis = get_trend_engine().analyze_repository_trends(repo_data)
 
+        # Upsert the vector before committing last_analyzed. A retry after a
+        # vector-store failure must not be short-circuited by the freshness guard.
+        if readme:
+            get_vector_store().add_repository_embedding(
+                repo_id,
+                readme,
+                {
+                    "name": repository_snapshot["name"],
+                    "full_name": repository_snapshot["full_name"],
+                    "language": repository_snapshot["language"],
+                    "stars": repository_snapshot["stargazers_count"],
+                    "updated_at": repository_snapshot["updated_at"],
+                },
+            )
+
+        analysis_time = datetime.utcnow()
+        trend_date = analysis_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
         with database.get_session() as session:
             repository = session.query(Repository).filter(Repository.id == repo_id).first()
             if not repository:
@@ -582,7 +601,7 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
             repository.score = scores.get("overall_score", 0.0)
             repository.trend_score = scores.get("trend_score", 0.0)
             repository.ai_relevance_score = evaluation.get("ai_relevance_score", 0.0)
-            repository.last_analyzed = datetime.utcnow()
+            repository.last_analyzed = analysis_time
 
             existing_classifications = session.query(Classification).filter(
                 Classification.repository_id == repo_id
@@ -602,33 +621,28 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
                 ))
 
             if trend_analysis:
-                session.add(Trend(
-                    repository_id=repo_id,
-                    date=datetime.utcnow(),
-                    stars=repository.stargazers_count,
-                    forks=repository.forks_count,
-                    contributors=repo_metrics.get("contributors_count", 0),
-                    commits=repo_metrics.get("commits_30_days", 0),
-                    weekly_growth_rate=repo_metrics.get("weekly_growth_rate", 0.0),
-                    trend_score=trend_analysis.get("trend_metrics", {}).get("trend_strength", 0.0),
-                ))
+                trend = session.query(Trend).filter(
+                    Trend.repository_id == repo_id,
+                    Trend.date >= trend_date,
+                    Trend.date < trend_date + timedelta(days=1),
+                ).first()
+                if trend is None:
+                    trend = Trend(repository_id=repo_id, date=trend_date)
+                    session.add(trend)
+
+                trend.stars = repository.stargazers_count
+                trend.forks = repository.forks_count
+                trend.contributors = repo_metrics.get("contributors_count", 0)
+                trend.commits = repo_metrics.get("commits_30_days", 0)
+                trend.weekly_growth_rate = repo_metrics.get("weekly_growth_rate", 0.0)
+                trend.trend_score = trend_analysis.get("trend_metrics", {}).get(
+                    "trend_strength", 0.0
+                )
 
             session.commit()
-
-        if readme:
-            get_vector_store().add_repository_embedding(
-                repo_id,
-                readme,
-                {
-                    "name": repository_snapshot["name"],
-                    "full_name": repository_snapshot["full_name"],
-                    "language": repository_snapshot["language"],
-                    "stars": repository_snapshot["stargazers_count"],
-                    "updated_at": repository_snapshot["updated_at"],
-                },
-            )
 
         logger.info("Completed analysis for repository %s", repository_snapshot["full_name"])
 
     except Exception:
-        logger.exception("Repository analysis background task failed for %s", repo_id)
+        logger.exception("Repository analysis worker task failed for %s", repo_id)
+        raise
