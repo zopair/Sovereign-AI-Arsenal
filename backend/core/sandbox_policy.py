@@ -84,6 +84,14 @@ def build_container_security_options(config: dict[str, Any] | None = None) -> di
     }
 
 
+def require_gvisor_runtime(runtimes: dict[str, Any], requested_runtime: str = "runsc") -> None:
+    """Reject missing or downgraded OCI runtimes before creating any container."""
+    if requested_runtime != "runsc" or "runsc" not in runtimes:
+        raise RuntimeError(
+            "gVisor runsc runtime is required for untrusted repository execution"
+        )
+
+
 def managed_container_filters() -> dict[str, list[str]]:
     """Restrict cleanup to containers created by this application component."""
     return {
