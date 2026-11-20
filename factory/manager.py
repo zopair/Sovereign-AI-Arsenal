@@ -117,7 +117,7 @@ def repo_identity(value: str) -> tuple[str, str]:
     if value.endswith(".git"):
         value = value[:-4]
     parts = value.split("/")
-    if len(parts) != 2 or not all(
+    if len(parts) != 2 or any(part in {".", ".."} for part in parts) or not all(
         re.fullmatch(r"[A-Za-z0-9_.-]+", part) for part in parts
     ):
         raise ValueError("Repository must be owner/name")
