@@ -10,8 +10,6 @@ import importlib
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from .celery_app import celery_app
 
 
@@ -20,6 +18,8 @@ def _ensure_vector_store() -> None:
     module = importlib.import_module("backend.database.vector_store")
     if module.vector_store is not None:
         return
+
+    import yaml
 
     config_path = Path(__file__).resolve().parents[1] / "config.yaml"
     with config_path.open("r", encoding="utf-8") as config_file:
