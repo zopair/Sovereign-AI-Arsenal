@@ -20,7 +20,7 @@ on:
         default: 100
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   PYTHON_VERSION: '3.11'
@@ -33,13 +33,15 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: '1.24.x'
       - name: Install actionlint
         run: |
-          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Validate workflow syntax and expressions
         run: actionlint -ignore 'SC2086' -ignore 'SC2129' .github/workflows/daily-update.yml
@@ -48,6 +50,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: write
     
     services:
       postgres:
@@ -75,19 +79,20 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        persist-credentials: false
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
         cache-dependency-path: 'backend/requirements.txt'
 
     - name: Install Docker
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
     - name: Install system dependencies
       run: |
@@ -146,6 +151,9 @@ jobs:
 
     - name: Run repository discovery and analysis
       id: update
+      env:
+        MAX_REPOS: ${{ github.event.inputs.max_repos || '100' }}
+        FORCE_UPDATE: ${{ github.event.inputs.force_update == 'true' && 'true' || 'false' }}
       run: |
         cd backend
         
@@ -420,9 +428,6 @@ jobs:
         EOF
         
         # Run the update script
-        MAX_REPOS="${{ github.event.inputs.max_repos || '100' }}"
-        FORCE_UPDATE="${{ github.event.inputs.force_update == 'true' || 'false' }}"
-        
         echo "Running repository update with MAX_REPOS=$MAX_REPOS, FORCE_UPDATE=$FORCE_UPDATE"
         
         python update_repositories.py 2>&1 | tee update.log
@@ -505,6 +510,12 @@ jobs:
 
     - name: Commit and push changes
       if: success() && steps.update.outputs.results != ''
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PROCESSED: ${{ steps.update.outputs.results && fromJson(steps.update.outputs.results).processed || 0 }}
+        NEW_REPOSITORIES: ${{ steps.update.outputs.results && fromJson(steps.update.outputs.results).new || 0 }}
+        UPDATED_REPOSITORIES: ${{ steps.update.outputs.results && fromJson(steps.update.outputs.results).updated || 0 }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
@@ -516,55 +527,65 @@ jobs:
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "Daily repository update - $(date -u +"%Y-%m-%d")
-          
-          - Add/update ${{ steps.update.outputs.results && fromJson(steps.update.outputs.results).processed || 0 }} repositories
-          - ${{ steps.update.outputs.results && fromJson(steps.update.outputs.results).new || 0 }} new repositories
-          - ${{ steps.update.outputs.results && fromJson(steps.update.outputs.results).updated || 0 }} updated repositories
-          
-          [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          
-          git push
+          git commit -m "Daily repository update - $(date -u +"%Y-%m-%d")" \
+            -m "- Add/update ${PROCESSED} repositories" \
+            -m "- ${NEW_REPOSITORIES} new repositories" \
+            -m "- ${UPDATED_REPOSITORIES} updated repositories" \
+            -m "[View detailed results](${RUN_URL})"
+
+          AUTH_HEADER="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${AUTH_HEADER}" push
         fi
 
     - name: Update README with latest stats
       if: always()
+      env:
+        UPDATE_RESULTS_JSON: ${{ steps.update.outputs.results }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        if [ -n "${{ steps.update.outputs.results }}" ]; then
+        if [ -n "$UPDATE_RESULTS_JSON" ]; then
           # Extract key metrics
-          PROCESSED=$(echo '${{ steps.update.outputs.results }}' | jq -r '.processed // 0')
-          NEW=$(echo '${{ steps.update.outputs.results }}' | jq -r '.new // 0')
-          UPDATED=$(echo '${{ steps.update.outputs.results }}' | jq -r '.updated // 0')
+          PROCESSED=$(printf '%s' "$UPDATE_RESULTS_JSON" | jq -r '.processed // 0')
+          NEW=$(printf '%s' "$UPDATE_RESULTS_JSON" | jq -r '.new // 0')
+          UPDATED=$(printf '%s' "$UPDATE_RESULTS_JSON" | jq -r '.updated // 0')
           
           # Update README badge or stats section if it exists
           if grep -q "📊 Latest Update" README.md; then
             sed -i "s/📊 Latest Update: .*/📊 Latest Update: $NEW new, $UPDATED updated ($PROCESSED processed)/" README.md
             git add README.md
             git commit -m "Update README stats - $(date -u +"%Y-%m-%d")" || true
-            git push || true
+            AUTH_HEADER="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${AUTH_HEADER}" push || true
           fi
         fi
 
     - name: Notify on failure
       if: failure()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        UPDATE_ERROR: ${{ steps.update.outputs.error || 'Unknown error' }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       run: |
         echo "❌ Repository update failed!"
-        echo "Check the logs for details: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        echo "Check the logs for details: $RUN_URL"
         
         # Create issue for tracking
         if command -v gh &> /dev/null; then
           gh issue create \
             --title "Daily repository update failed - $(date -u +"%Y-%m-%d")" \
-            --body "The daily repository update workflow failed on $(date -u +"%Y-%m-%d %H:%M:%S UTC").
-            
-            **Workflow Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            
-            **Error Details:**
-            \`\`\`
-            ${{ steps.update.outputs.error || 'Unknown error' }}
-            \`\`\`
-            
-            Please investigate and fix the issue." \
+            --body "$(cat <<EOF
+        The daily repository update workflow failed on $(date -u +"%Y-%m-%d %H:%M:%S UTC").
+
+        **Workflow Run:** $RUN_URL
+
+        **Error Details:**
+        \`\`\`
+        $UPDATE_ERROR
+        \`\`\`
+
+        Please investigate and fix the issue.
+        EOF
+        )" \
             --label "bug" --label "ci/cd" || true
         fi
 
@@ -585,7 +606,7 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
     
     - name: Run security scan
       run: |
@@ -594,7 +615,7 @@ jobs:
         bandit -r backend/ -f json -o security-report.json || true
     
     - name: Upload security report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: security-report
         path: security-report.json
