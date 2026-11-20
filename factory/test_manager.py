@@ -200,6 +200,37 @@ class GitHubInspectorTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "truncated directory"):
                 manager.inspect("acme", "app")
 
+    def test_github_get_retries_secondary_rate_limit_403_with_retry_after(self):
+        headers = Message()
+        headers["Retry-After"] = "0"
+        headers["X-RateLimit-Remaining"] = "100"
+        rate_limit = urllib.error.HTTPError(
+            "https://api.github.com/repos/acme/app",
+            403,
+            "secondary rate limit",
+            headers,
+            None,
+        )
+        responses = [rate_limit, FakeResponse({"ok": True})]
+        sleeps = []
+
+        def opener(_request, timeout):
+            self.assertEqual(timeout, 15)
+            result = responses.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        result = manager.github_get(
+            "/repos/acme/app",
+            opener=opener,
+            sleep_fn=sleeps.append,
+            max_attempts=2,
+        )
+
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(sleeps, [0.0])
+
 
 if __name__ == "__main__":
     unittest.main()
