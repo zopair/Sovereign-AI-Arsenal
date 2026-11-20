@@ -76,3 +76,59 @@ async def test_pool_reports_unavailable_when_all_providers_are_cooling_down():
 def test_provider_rejects_non_https_remote_endpoint():
     with pytest.raises(ValueError):
         Provider(name="unsafe", base_url="http://remote.example/v1", api_key="x", model="m")
+
+def test_local_ollama_provider_can_be_loaded_without_api_credentials(monkeypatch):
+    import json
+
+    from backend.core.provider_router import providers_from_environment
+
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.setenv(
+        "ZI_LLM_PROVIDERS",
+        json.dumps([{
+            "name": "ollama-local",
+            "base_url": "http://localhost:11434/v1",
+            "model": "gemma4:e2b",
+        }]),
+    )
+
+    providers = providers_from_environment()
+
+    assert len(providers) == 1
+    assert providers[0].name == "ollama-local"
+    assert providers[0].api_key == ""
+    assert providers[0].base_url == "http://localhost:11434/v1"
+
+
+@pytest.mark.asyncio
+async def test_local_ollama_request_uses_openai_compatible_path_without_auth_header():
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        captured["authorization"] = request.headers.get("Authorization")
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "local response"}}]},
+        )
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    local_provider = Provider(
+        name="ollama-local",
+        base_url="http://localhost:11434/v1",
+        api_key="",
+        model="gemma4:e2b",
+        timeout_seconds=2,
+        cooldown_seconds=0,
+    )
+    pool = ProviderPool([local_provider], client=client)
+
+    result = await pool.chat_completion({
+        "messages": [{"role": "user", "content": "hello"}],
+    })
+
+    assert captured["url"] == "http://localhost:11434/v1/chat/completions"
+    assert captured["authorization"] is None
+    assert result["choices"][0]["message"]["content"] == "local response"
+    await client.aclose()
+
