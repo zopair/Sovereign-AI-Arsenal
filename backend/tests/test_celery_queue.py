@@ -41,6 +41,12 @@ def test_repository_tasks_are_registered_with_bounded_retries():
     assert analyze_repository_task.max_retries == 3
 
 
+def test_worker_health_ping_is_side_effect_free():
+    from backend.core.repository_tasks import worker_health_ping
+
+    assert worker_health_ping.run() == {"status": "ok"}
+
+
 def test_discovery_task_creates_its_engine_inside_the_worker(monkeypatch):
     from backend.core.repository_tasks import discover_repositories_task
 
