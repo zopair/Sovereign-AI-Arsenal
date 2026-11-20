@@ -5,6 +5,7 @@ from pathlib import Path
 from types import ModuleType
 
 import yaml
+import pytest
 
 
 def test_celery_uses_existing_redis_and_restricts_task_payloads_to_json(monkeypatch):
