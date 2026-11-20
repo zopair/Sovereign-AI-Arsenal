@@ -13,6 +13,7 @@ from sqlalchemy import text
 from .database.db import init_database
 from .database.vector_store import init_vector_store
 from .api.routes import router as api_router
+from .api.provider_routes import router as provider_router, close_provider_pool
 from .security import api_key_is_valid
 
 
@@ -54,8 +55,11 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized")
     init_vector_store(config.get("vector_store", {}))
     logger.info("Vector store initialized")
-    yield
-    logger.info("Shutting down Sovereign AI Arsenal...")
+    try:
+        yield
+    finally:
+        await close_provider_pool()
+        logger.info("Shutting down Sovereign AI Arsenal...")
 
 
 app = FastAPI(
@@ -66,6 +70,7 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
 
 @app.middleware("http")
 async def enforce_api_key(request: Request, call_next):
@@ -113,6 +118,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(api_router)
+app.include_router(provider_router)
 
 
 @app.get("/health")
