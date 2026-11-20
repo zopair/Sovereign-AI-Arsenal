@@ -26,7 +26,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -39,6 +39,7 @@ services:
     restart: unless-stopped
 
   backend:
+    image: sovereign-ai-arsenal-backend:local
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -55,6 +56,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       LOG_LEVEL: INFO
       DEBUG: "false"
+      HF_HOME: /app/backend/data/huggingface
+      SENTENCE_TRANSFORMERS_HOME: /app/backend/data/sentence-transformers
     ports:
       - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
     depends_on:
@@ -71,6 +74,46 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - sovereign-ai-network
+    restart: unless-stopped
+
+  worker:
+    image: sovereign-ai-arsenal-backend:local
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command:
+      - celery
+      - -A
+      - backend.core.celery_app:celery_app
+      - worker
+      - --loglevel=INFO
+      - --concurrency=1
+      - --queues=repository
+      - --hostname=repository-worker@%h
+    init: true
+    stop_grace_period: 30s
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: sovereign_ai_arsenal
+      DB_USER: app_user
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      REDIS_URL: redis://redis:6379/0
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LOG_LEVEL: INFO
+      HF_HOME: /app/backend/data/huggingface
+      SENTENCE_TRANSFORMERS_HOME: /app/backend/data/sentence-transformers
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_logs:/app/backend/logs
+      - backend_data:/app/backend/data
     networks:
       - sovereign-ai-network
     restart: unless-stopped
