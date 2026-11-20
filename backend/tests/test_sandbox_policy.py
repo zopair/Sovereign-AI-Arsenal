@@ -78,6 +78,23 @@ def test_runtime_check_accepts_only_configured_gvisor():
     require_gvisor_runtime({"runsc": {"path": "runsc"}})
 
 
+def test_repository_path_policy_rejects_symlinks_and_paths_outside_checkout(tmp_path):
+    from backend.core.sandbox_policy import is_safe_repo_path
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    outside = tmp_path / "host-secret.txt"
+    outside.write_text("must not be read", encoding="utf-8")
+    regular = root / "README.md"
+    regular.write_text("safe", encoding="utf-8")
+    link = root / "leak.txt"
+    link.symlink_to(outside)
+
+    assert is_safe_repo_path(root, regular)
+    assert not is_safe_repo_path(root, link)
+    assert not is_safe_repo_path(root, outside)
+
+
 def test_cleanup_filters_only_containers_owned_by_this_sandbox_manager():
     assert managed_container_filters() == {
         "label": [
