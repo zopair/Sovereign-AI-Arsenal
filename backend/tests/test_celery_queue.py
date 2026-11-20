@@ -98,7 +98,7 @@ def test_api_routes_enqueue_durable_tasks_and_expose_task_status():
     status = ast.unparse(functions["get_task_status"])
 
     assert ".apply_async(" in discovery
-    assert ".delay(" in analysis
+    assert ".apply_async(" in analysis
     assert "AsyncResult(" in status
     assert "BackgroundTasks" not in routes_path.read_text(encoding="utf-8")
 
