@@ -25,6 +25,7 @@ Sovereign AI Arsenal brings repository discovery, multi-dimensional evaluation, 
 - **API-first integration:** FastAPI endpoints and interactive API documentation.
 - **Provider-neutral inference:** optional OpenAI-compatible chat gateway with cooldowns and failover.
 - **Operational foundations:** Docker Compose, PostgreSQL, Redis, and monitoring components.
+- **Repository sandbox boundary:** gVisor-required execution with network disabled by default; see [Sandbox Security](docs/SANDBOX_SECURITY.md).
 
 ## Architecture
 
