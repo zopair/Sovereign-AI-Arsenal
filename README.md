@@ -25,6 +25,7 @@ Sovereign AI Arsenal brings repository discovery, multi-dimensional evaluation, 
 - **API-first integration:** FastAPI endpoints and interactive API documentation.
 - **Provider-neutral inference:** optional OpenAI-compatible chat gateway with cooldowns and failover.
 - **Durable repository jobs:** Celery worker with Redis AOF persistence, bounded retries, task status, and PostgreSQL-backed repository records.
+- **Scheduled repository inventory:** read-only GitHub Actions audit with bounded batch inspection and downloadable JSON reports; no Cloudflare deployment required.
 - **Operational foundations:** Docker Compose, PostgreSQL, Redis, and monitoring components.
 - **Repository sandbox module (not yet API-integrated):** gVisor-required execution policy with network disabled by default; see [Sandbox Security](docs/SANDBOX_SECURITY.md).
 
@@ -101,6 +102,12 @@ source .env
 set +a
 PYTHONPATH=. uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+## Scheduled repository audit
+
+A daily GitHub Actions workflow inspects the configured Zubair repositories and uploads a JSON inventory report. It uses a read-only GitHub token, pinned actions, and a bounded standard-library runner. Reports are retained as workflow artifacts for 14 days.
+
+This provides a free scheduled alternative for batch repository inventory and documentation auditing when Cloudflare credentials or D1 deployment are unavailable. It is not an always-on worker API or a replacement for persistent D1 state; see [Repository Audit](docs/REPOSITORY_AUDIT.md).
 
 ## Background task execution
 
