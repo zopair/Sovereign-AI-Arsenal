@@ -32,7 +32,7 @@ The token is optional for public repositories, but authenticated read-only acces
 
 ## Proof of Concept & Enterprise Customization Readiness
 
-<badge>Proof of Concept</badge>
+**Status:** Proof of Concept
 
 The inspector is a reusable read-only capability, not a complete AI orchestration engine. Capability detection is heuristic and must be reviewed before making release or security decisions. Enterprise extensions can add repository policy packs, richer evidence scoring, organization-wide pagination, and audit persistence without changing the read-only boundary.
 
