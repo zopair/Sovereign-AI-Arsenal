@@ -132,7 +132,7 @@ class GitHubInspectorTests(unittest.TestCase):
             report = manager.inspect("acme", "app")
 
         self.assertEqual(report["path_count"], 2)
-        self.assertEqual(report["license_files"], ["README.md"] if False else [])
+        self.assertEqual(report["license_files"], [])
         self.assertTrue(report["tree_recovered_from_truncation"])
         self.assertFalse(report["tree_truncated"])
         self.assertIn("/repos/acme/app/git/commits/commit-sha", requests)
