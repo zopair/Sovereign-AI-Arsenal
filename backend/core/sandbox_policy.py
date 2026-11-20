@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from pathlib import Path
 from urllib.parse import urlparse
 
 
@@ -82,6 +83,19 @@ def build_container_security_options(config: dict[str, Any] | None = None) -> di
         },
         "labels": dict(MANAGED_LABELS),
     }
+
+
+
+def is_safe_repo_path(root: "Path", candidate: "Path") -> bool:
+    """Reject symlinks and resolved paths that escape the temporary checkout."""
+    try:
+        if candidate.is_symlink():
+            return False
+        return candidate.resolve(strict=False).is_relative_to(
+            root.resolve(strict=True)
+        )
+    except (OSError, RuntimeError):
+        return False
 
 
 def require_gvisor_runtime(runtimes: dict[str, Any], requested_runtime: str = "runsc") -> None:
