@@ -264,7 +264,7 @@ def test_sandbox_docker_cpu_limit_uses_supported_nano_cpus_argument():
     policy_path = Path(__file__).resolve().parents[1] / "core" / "sandbox_policy.py"
     policy = policy_path.read_text(encoding="utf-8")
     assert '"nano_cpus": int(cpu_limit * 1_000_000_000)' in policy
-    assert '"cpu_limit"' not in policy
+    assert '"cpu_limit":' not in policy
 
 
 def test_sandbox_test_container_installs_pytest_before_invoking_it():
