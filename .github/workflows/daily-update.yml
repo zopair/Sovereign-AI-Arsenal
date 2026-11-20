@@ -44,7 +44,7 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Validate workflow syntax and expressions
-        run: actionlint -ignore 'SC2086' -ignore 'SC2129' .github/workflows/daily-update.yml
+        run: actionlint .github/workflows/daily-update.yml
 
   update-repositories:
     if: github.event_name != 'pull_request'
