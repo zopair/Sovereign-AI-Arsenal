@@ -108,7 +108,7 @@ jobs:
             -e REDIS_URL=redis://127.0.0.1:6379/0 \
             -e LOG_DIR=/tmp/sovereign-backend-smoke-logs \
             sovereign-ai-arsenal-backend:ci
-      - name: Verify health and API authentication
+      - name: Verify backend health
         run: |
           healthy=false
           for _ in $(seq 1 90); do
@@ -159,6 +159,8 @@ jobs:
               raise TimeoutError("Celery worker did not complete the health task")
           PY
 
+      - name: Verify API authentication
+        run: |
           unauth_status=$(curl -sS -o /tmp/backend-unauth.json -w "%{http_code}" \
             http://127.0.0.1:8000/api/v1/statistics)
           if [ "$unauth_status" != "401" ]; then
