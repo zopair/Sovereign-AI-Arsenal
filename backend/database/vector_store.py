@@ -63,7 +63,7 @@ class VectorStore:
             }
             
             # Add to collection
-            self.collection.add(
+            self.collection.upsert(
                 embeddings=[embedding.tolist()],
                 documents=[content],
                 metadatas=[repo_metadata],
@@ -137,10 +137,7 @@ class VectorStore:
                                  metadata: Dict[str, Any] = None):
         """Update repository embedding"""
         try:
-            # Remove existing embedding
-            self.collection.delete(ids=[repo_id])
-            
-            # Add new embedding
+            # Upsert replaces the existing record without a delete/add gap.
             self.add_repository_embedding(repo_id, content, metadata)
             
             logger.info(f"Updated embedding for repository: {repo_id}")
@@ -195,7 +192,7 @@ class VectorStore:
                 embeddings.append(embedding.tolist())
             
             # Add to collection
-            self.collection.add(
+            self.collection.upsert(
                 embeddings=embeddings,
                 documents=documents,
                 metadatas=metadatas,
