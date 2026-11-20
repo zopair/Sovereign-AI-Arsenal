@@ -1,471 +1,170 @@
 # Sovereign AI Arsenal
 
-A modular AI intelligence platform for discovering, analyzing, and monitoring AI-related repositories. Built with FastAPI, PostgreSQL, and advanced AI analytics.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Status](https://img.shields.io/badge/Status-PoC%20%2F%20MVP-orange.svg)](#proof-of-concept--enterprise-customization-readiness)
 
-## 🚀 Features
+**A modular intelligence platform for discovering, evaluating, and monitoring software repositories—with an optional provider-neutral LLM gateway.**
 
-### Core Capabilities
-- **Intelligent Repository Discovery**: Automated GitHub API integration with smart filtering
-- **Multi-dimensional Analysis**: Comprehensive repository evaluation across technical, business, and innovation metrics
-- **Advanced Classification**: AI-powered categorization and tagging system
-- **Trend Analysis**: Sophisticated growth pattern analysis and predictions
-- **Vector Search**: Semantic search capabilities using embeddings
-- **Real-time Monitoring**: Continuous tracking of repository metrics and trends
+Sovereign AI Arsenal is designed as an extensible foundation: repository intelligence and analytics remain separate from model-provider integration, so model services can be changed without coupling the application to one vendor.
 
-### Technical Highlights
-- **Modular Architecture**: Clean, scalable design with separation of concerns
-- **Operational Foundations**: Structured logging, health checks, and monitoring integrations
-- **High Performance**: Async operations, caching, and optimized database queries
-- **Containerized**: Full Docker support with orchestration
-- **API-First**: RESTful API with comprehensive documentation
+## Business problem
 
-## 📋 Requirements
+Teams evaluating large software ecosystems often rely on fragmented discovery tools, manual technical reviews, and provider-specific AI integrations. This makes it harder to compare projects consistently, track ecosystem changes, and control model-provider dependency.
+
+## Solution
+
+Sovereign AI Arsenal brings repository discovery, multi-dimensional evaluation, classification, trend analysis, semantic search, and API access into one modular platform. Its optional LLM Provider Router adds round-robin selection and quota-aware failover across independently configured OpenAI-compatible providers.
+
+## Capabilities
+
+- **Repository discovery:** GitHub-backed repository intake and filtering.
+- **Technical and business evaluation:** configurable scoring and classification foundations.
+- **Trend intelligence:** repository activity and growth analysis.
+- **Semantic search:** vector-backed discovery capabilities.
+- **API-first integration:** FastAPI endpoints and interactive API documentation.
+- **Provider-neutral inference:** optional OpenAI-compatible chat gateway with cooldowns and failover.
+- **Operational foundations:** Docker Compose, PostgreSQL, Redis, and monitoring components.
+
+## Architecture
+
+```mermaid
+flowchart TB
+    Client[Users and Integrations] --> API[FastAPI Application]
+    API --> Discovery[Repository Discovery]
+    API --> Analysis[Evaluation and Classification]
+    API --> Trends[Trend Analytics]
+    API --> Search[Semantic Search]
+    Discovery --> GitHub[GitHub API]
+    Analysis --> Router[Optional LLM Provider Router]
+    Router --> P1[Configured Provider A]
+    Router --> P2[Configured Provider B]
+    API --> DB[(PostgreSQL)]
+    API --> Cache[(Redis)]
+    Search --> Vector[(Vector Store)]
+    API --> Metrics[Metrics and Monitoring]
+```
+
+The provider router is optional and remains disabled until configured. Failover is between distinct providers; duplicate credentials must not be used to bypass a provider's published quotas.
+
+## Quick start
+
+### Requirements
 
 - Python 3.11+
-- PostgreSQL 15+
-- Redis 7+
-- Docker & Docker Compose
-- GitHub API Token
-- OpenAI API Key (for LLM analysis)
+- Docker Engine and Docker Compose (recommended)
+- GitHub token for authenticated GitHub API access
+- PostgreSQL and Redis when running outside the supplied Compose stack
 
-## 🛠️ Installation
+An LLM API key is **not** required to start the core application. Configure provider credentials only if you intend to use LLM-backed analysis.
 
-### Quick Start with Docker
+### Docker Compose
 
-1. **Clone the repository**
 ```bash
-git clone <repository-url>
-cd sovereign-ai-arsenal
-```
-
-2. **Configure environment variables**
-```bash
+git clone https://github.com/zopair/Sovereign-AI-Arsenal.git
+cd Sovereign-AI-Arsenal
 cp .env.example .env
-# Generate four different secrets with: openssl rand -hex 32
-# Set POSTGRES_ADMIN_PASSWORD, DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, and API_AUTH_TOKEN
 ```
 
-3. **Start the platform**
+Edit `.env` and set unique values for the required database and API secrets. Keep the file private and never commit it.
+
 ```bash
-docker compose up -d
+docker compose up --build -d
 ```
 
-4. **Access the services**
-- API: http://localhost:8000 (send the X-API-Key header on /api/* and /metrics)
-- API Documentation: http://localhost:8000/docs
-- Grafana Dashboard: http://localhost:3000 (admin; password from GRAFANA_ADMIN_PASSWORD)
-- PostgreSQL: localhost:5432 (local development access only)
-- Redis is internal to the Compose network and is not published on the host
-- Prometheus: http://localhost:9090
+Then open:
 
-### Manual Installation
+| Service | Local address |
+|---|---|
+| API health | http://127.0.0.1:8000/health |
+| Interactive API docs | http://127.0.0.1:8000/docs |
+| Prometheus | http://127.0.0.1:9090 |
+| Grafana | http://127.0.0.1:3000 |
 
-1. **Install system dependencies**
-```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install python3.11 python3.11-venv postgresql-15 redis-server
+Protected API routes require the configured `X-API-Key` header. Keep services bound to localhost unless a separately reviewed deployment provides TLS, identity, and access controls.
 
-# macOS
-brew install python@3.11 postgresql@15 redis
-```
+### Local Python development
 
-2. **Set up Python environment**
 ```bash
 cd backend
-python3.11 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python3.11 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+cd ..
+set -a
+source .env
+set +a
+PYTHONPATH=. uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-3. **Configure database**
-```bash
-# Create PostgreSQL database
-createdb sovereign_ai_arsenal
+## LLM Provider Router
 
-# Run migrations
-python -m alembic upgrade head
+The optional gateway exposes:
+
+```text
+POST /api/v1/llm/chat/completions
 ```
 
-4. **Configure environment**
-```bash
-cp ../.env.example ../.env
-# Set POSTGRES_ADMIN_PASSWORD, DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, and API_AUTH_TOKEN; keep secrets out of Git
-set -a && source ../.env && set +a
-```
+Configure independent OpenAI-compatible providers through `ZI_LLM_PROVIDERS`; store each credential in its named environment variable rather than embedding secrets in JSON or source control.
 
-5. **Start the application**
-```bash
-cd .. && PYTHONPATH=. uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
+Example:
 
 ```bash
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=sovereign_ai_arsenal
-DB_USER=app_user
-DB_PASSWORD=<unique-app-database-secret>
-POSTGRES_ADMIN_PASSWORD=<unique-postgres-admin-secret>
-API_AUTH_TOKEN=<unique-api-access-secret>
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-
-# APIs
-GITHUB_TOKEN=your_github_token_here
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Application
-LOG_LEVEL=INFO
-API_HOST=0.0.0.0
-API_PORT=8000
-DEBUG=false
+ZI_LLM_PROVIDERS='[
+  {"name":"provider-a","base_url":"https://api.example-a.com/v1","model":"model-a","api_key_env":"PROVIDER_A_API_KEY"},
+  {"name":"provider-b","base_url":"https://api.example-b.com/v1","model":"model-b","api_key_env":"PROVIDER_B_API_KEY"}
+]'
 ```
 
-### Configuration File (config.yaml)
+See [LLM Provider Router documentation](docs/LLM_PROVIDER_ROUTER.md) for request examples, environment settings, retry behavior, and provider configuration guidance.
 
-The platform uses config.yaml for non-secret defaults. Database credentials are supplied only through environment variables. The Compose bootstrap creates a separate, non-superuser app_user role for the API.
+**Current boundaries:** non-streaming chat completions only; cooldown state is process-local; no built-in provider credentials or guaranteed free-tier access. Confirm each provider's current API terms, model availability, and quotas before enabling it.
 
-```yaml
-app_name: "Sovereign AI Arsenal"
-version: "1.0.0"
+## Development and validation
 
-database:
-  host: localhost
-  port: 5432
-  name: sovereign_ai_arsenal
-  user: app_user
-  # DB_PASSWORD is supplied through the environment; never commit credentials.
-  pool_size: 10
-  max_overflow: 20
-
-github:
-  api_url: "https://api.github.com"
-  token: ${GITHUB_TOKEN}
-  rate_limit:
-    requests_per_hour: 5000
-    retry_after: 60
-
-ai_models:
-  embedding_model: "all-MiniLM-L6-v2"
-  llm_model: "gpt-4"
-  max_tokens: 4000
-  temperature: 0.1
-
-scoring:
-  weights:
-    stars: 0.3
-    forks: 0.2
-    contributors: 0.2
-    commit_frequency: 0.15
-    trend_growth: 0.15
-  thresholds:
-    minimum_stars: 30
-    trending_growth_rate: 0.1
-    active_contributors: 3
-```
-
-## 📚 API Documentation
-
-### Core Endpoints
-
-#### Repository Management
-- `GET /api/v1/repositories` - List repositories with filtering
-- `GET /api/v1/repositories/{id}` - Get repository details
-- `POST /api/v1/discover` - Discover new repositories
-- `POST /api/v1/repositories/{id}/analyze` - Analyze repository
-
-#### Search & Discovery
-- `GET /api/v1/search` - Search repositories
-- `GET /api/v1/trending` - Get trending repositories
-- `GET /api/v1/categories` - List categories
-
-#### Analytics
-- `GET /api/v1/statistics` - Platform statistics
-- `GET /metrics` - Application metrics
-
-### Example API Usage
-
-All `/api/*` endpoints require the configured API key:
+Install the backend test dependencies as documented by the repository, then run:
 
 ```bash
-curl -H "X-API-Key: $API_AUTH_TOKEN" "http://127.0.0.1:8000/api/v1/statistics"
-```
-
-```python
-import httpx
-
-# Discover repositories
-async def discover_repos():
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "http://localhost:8000/api/v1/discover",
-            params={"queries": ["machine learning", "deep learning"], "max_repos_per_query": 50}
-        )
-        return response.json()
-
-# Search repositories
-async def search_repos(query: str):
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "http://localhost:8000/api/v1/search",
-            params={"q": query, "search_type": "semantic"}
-        )
-        return response.json()
-```
-
-## 🏗️ Architecture
-
-### Project Structure
-
-```
-backend/
-├── main.py                 # FastAPI application entry point
-├── config.yaml            # Configuration file
-├── requirements.txt       # Python dependencies
-├── Dockerfile            # Docker configuration
-├── api/
-│   └── routes.py         # API route definitions
-├── core/
-│   ├── discovery.py      # GitHub discovery engine
-│   ├── evaluator.py      # Repository evaluation
-│   ├── classifier.py     # AI classification
-│   ├── scorer.py         # Comprehensive scoring
-│   ├── trend_engine.py   # Trend analysis
-│   └── llm_analyzer.py  # LLM-powered analysis
-├── database/
-│   ├── db.py            # Database configuration
-│   ├── models.py        # SQLAlchemy models
-│   └── vector_store.py  # Vector embeddings
-└── logging_config.py    # Logging configuration
-```
-
-### Core Components
-
-1. **Discovery Engine**: Automated GitHub repository discovery with intelligent filtering
-2. **Evaluator**: Multi-dimensional repository analysis and scoring
-3. **Classifier**: AI-powered categorization and tagging
-4. **Scorer**: Comprehensive scoring system with weighted metrics
-5. **Trend Engine**: Advanced trend analysis and predictions
-6. **LLM Analyzer**: Deep language model analysis for insights
-7. **Vector Store**: Semantic search using embeddings
-
-### Database Schema
-
-The platform uses PostgreSQL with the following main entities:
-
-- **Repository**: Core repository information
-- **RepositoryMetrics**: Detailed metrics and analytics
-- **Classification**: AI-powered categories and tags
-- **Trend**: Historical trend data
-- **Contributor**: Contributor information
-- **Commit**: Commit history and analysis
-
-## 🔧 Development
-
-### Running Tests
-
-```bash
-# Install test dependencies
-pip install pytest pytest-asyncio pytest-cov
-
-# Run tests
+python -m compileall -q backend
 pytest
-
-# Run with coverage
-pytest --cov=backend --cov-report=html
 ```
 
-### Code Quality
+Build the backend container:
 
 ```bash
-# Format code
-black .
-isort .
-
-# Lint code
-flake8 .
-
-# Type checking
-mypy .
+docker compose build
 ```
 
-### Database Migrations
+The pull-request checks validate focused regressions and the backend container build. A green CI result is not a substitute for provider integration testing with credentials or a production deployment review.
 
-```bash
-# Create migration
-alembic revision --autogenerate -m "Description"
+## Proof of Concept & Enterprise Customization Readiness
 
-# Apply migration
-alembic upgrade head
 
-# Rollback migration
-alembic downgrade -1
-```
 
-### Adding New Features
+| Area | Current status |
+|---|---|
+| Repository discovery and analysis | Modular PoC foundation |
+| API and containerization | Implemented; validate deployment configuration |
+| LLM provider routing | Implemented for non-streaming chat; integration credentials required |
+| Shared provider state across workers | Not implemented; cooldown state is process-local |
+| Enterprise identity and authorization | Not implemented; current API key gate is not a tenant IAM system |
+| Production operations and SLOs | Require environment-specific hardening and validation |
 
-1. **Create new core module** in `backend/core/`
-2. **Define database models** in `backend/database/models.py`
-3. **Add API endpoints** in `backend/api/routes.py`
-4. **Write tests** for new functionality
-5. **Update documentation**
+**Release posture:** Proof of Concept / MVP. The repository is suitable for technical evaluation and controlled demonstrations. Enterprise adoption requires a scoped customization, security, reliability, data-governance, and deployment review.
 
-## 📊 Monitoring
+## Roadmap
 
-### Metrics Collection
+- [ ] Add shared provider cooldown and health state when multi-worker deployment requires it.
+- [ ] Expand provider contract tests and opt-in live integration checks.
+- [ ] Define tenant-aware identity and authorization before exposing multi-user deployments.
+- [ ] Validate observability, backup, recovery, and operational SLOs for each target environment.
 
-The platform includes comprehensive monitoring:
+## License
 
-- **Application Metrics**: Request times, error rates, user activity
-- **Database Metrics**: Query performance, connection pool usage
-- **Business Metrics**: Repository counts, analysis success rates
-- **System Metrics**: CPU, memory, disk usage
+This project is distributed under the [MIT License](LICENSE). Review third-party component licenses and provider terms independently before redistributing or deploying an assembled solution.
 
-### Grafana Dashboards
+## Intellectual Property & Authorship
 
-Pre-configured dashboards include:
+Project authorship and attribution: **Aly Hussein Zopair (علي حسين زبير ALY HUSSEIN ZOPAIR)**.
 
-- **Platform Overview**: High-level system health
-- **API Performance**: Request metrics and error tracking
-- **Database Performance**: Query analysis and connection monitoring
-- **Business Analytics**: Repository discovery and analysis metrics
-
-### Alerting
-
-Configure alerts in Prometheus for:
-
-- High error rates
-- Slow database queries
-- API downtime
-- Resource exhaustion
-
-## 🔒 Security
-
-### Authentication
-
-The API enforces a shared API key on `/api/*` and `/metrics` using the `X-API-Key` header. Configure a unique `API_AUTH_TOKEN` secret before startup. If the secret is missing, protected routes fail closed with HTTP 503; missing or incorrect keys receive HTTP 401. `/health` remains unauthenticated for container health checks. This is a single shared-token gate, not user identity, role-based authorization, tenant isolation, or OAuth. Keep host bindings loopback-only and do not expose the service publicly until a full identity and authorization model is implemented and independently reviewed.
-
-### Rate Limiting
-
-Built-in rate limiting to prevent abuse:
-
-```yaml
-api:
-  rate_limiting:
-    requests_per_minute: 100
-    burst_size: 20
-```
-
-### Data Protection
-
-- Keep database and monitoring ports on loopback unless a reviewed deployment requires otherwise
-- Supply credentials through environment variables or a secret manager
-- Terminate public traffic through a configured TLS reverse proxy
-- Add encryption-at-rest and audit controls before production use
-
-## 🚀 Deployment
-
-### Production Deployment
-
-1. **Environment Setup**
-```bash
-# Production environment variables
-export ENVIRONMENT=production
-export LOG_LEVEL=WARNING
-export DEBUG=false
-```
-
-2. **Database Setup**
-```bash
-# Create production database
-createdb sovereign_ai_arsenal_prod
-
-# Run migrations with production settings
-alembic upgrade head
-```
-
-3. **Application Deployment**
-```bash
-# Build and deploy with Docker
-docker compose -f docker-compose.prod.yml up -d
-
-# Or manual deployment
-PYTHONPATH=. uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 4
-```
-
-### Scaling
-
-- **Horizontal Scaling**: Multiple API instances behind load balancer
-- **Database Scaling**: Read replicas and connection pooling
-- **Cache Scaling**: Redis cluster for high availability
-- **Storage Scaling**: Distributed file system for vector data
-
-### Backup Strategy
-
-- **Database Backups**: Automated daily backups with point-in-time recovery
-- **Vector Store Backups**: Regular snapshots of embedding data
-- **Configuration Backups**: Version-controlled configuration management
-- **Disaster Recovery**: Multi-region deployment for critical services
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow PEP 8 style guidelines
-- Write comprehensive tests
-- Update documentation
-- Use meaningful commit messages
-- Ensure CI/CD passes
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **Documentation**: [Full documentation](https://docs.sovereign-ai-arsenal.com)
-- **Issues**: [GitHub Issues](https://github.com/your-org/sovereign-ai-arsenal/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/sovereign-ai-arsenal/discussions)
-- **Email**: support@sovereign-ai-arsenal.com
-
-## 🎯 Roadmap
-
-### Version 1.1
-- [ ] Enhanced ML model recommendations
-- [ ] Real-time WebSocket updates
-- [ ] Advanced filtering options
-- [ ] Export functionality
-
-### Version 1.2
-- [ ] Multi-language repository support
-- [ ] Custom scoring algorithms
-- [ ] Team collaboration features
-- [ ] Advanced analytics dashboard
-
-### Version 2.0
-- [ ] Machine learning model hosting
-- [ ] Automated repository analysis
-- [ ] Integration with more platforms
-- [ ] Advanced AI insights
-
----
-
-**Built with ❤️ by the Sovereign AI Arsenal team**
-
-### Existing database volumes
-
-The role-bootstrap script runs only when PostgreSQL initializes an empty data volume. If this stack has already been started with an older volume, **do not delete the volume** to apply the new role model. Back up the database and perform a reviewed role/password migration against the existing instance first.
+This notice identifies the project author and does not override the repository license or the licenses and rights of third-party components.
