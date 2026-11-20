@@ -51,7 +51,7 @@ flowchart TB
     API --> Metrics[Metrics and Monitoring]
 ```
 
-The provider router is optional and remains disabled until configured. Failover is between distinct providers; duplicate credentials must not be used to bypass a provider's published quotas. Repository discovery and analysis are queued to a dedicated Celery worker; see [Task Execution](docs/TASK_EXECUTION.md) for retry and persistence boundaries.
+The provider router is optional and remains disabled until configured. It supports a local Ollama endpoint without a provider API key when the backend runs on the same host. Failover is between distinct providers; duplicate credentials must not be used to bypass a provider's published quotas. Repository discovery and analysis are queued to a dedicated Celery worker; see [Task Execution](docs/TASK_EXECUTION.md) for retry and persistence boundaries.
 
 ## Quick start
 

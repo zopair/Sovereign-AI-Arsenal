@@ -24,6 +24,29 @@ A provider entry supports:
 
 Remote endpoints must use HTTPS. Plain HTTP is accepted only for loopback development endpoints.
 
+## Local Ollama fallback (no provider API key)
+
+The router can use a local Ollama server through its OpenAI-compatible chat-completions endpoint. Local Ollama requests do not require authentication; because this router uses direct HTTP requests rather than the OpenAI SDK, the provider entry can omit api_key_env entirely.
+
+Install Ollama, start its local server, and download a model:
+
+~~~bash
+ollama serve
+ollama pull gemma4:e2b
+~~~
+
+Then configure the router for a locally running Python backend:
+
+~~~bash
+export ZI_LLM_PROVIDERS='[{"name":"ollama-local","base_url":"http://localhost:11434/v1","model":"gemma4:e2b","timeout_seconds":120,"cooldown_seconds":15}]'
+~~~
+
+No OpenAI, Groq, Gemini, or OpenRouter API key is required for this local provider. The example model download is approximately 7.2 GB; Ollama recommends about 8 GB of available VRAM or unified memory. CPU inference may work with lower memory but can be substantially slower. Review the model's own license and usage terms separately from the Ollama runtime.
+
+**Important networking boundary:** this localhost example is for running the FastAPI backend directly on the same machine as Ollama. Inside Docker Compose, localhost refers to the backend container, not the host. The default Compose stack does not expose or provision Ollama; do not point a containerized backend at localhost and assume it reaches the host model.
+
+Official references: [Ollama local API](https://github.com/ollama/ollama/blob/main/docs/api/introduction.mdx), [OpenAI compatibility](https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx), and [local authentication behavior](https://github.com/ollama/ollama/blob/main/docs/api/authentication.mdx).
+
 ## Use the endpoint
 
 All API routes require the existing `X-API-Key: $API_AUTH_TOKEN` application credential.
