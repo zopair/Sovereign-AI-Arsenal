@@ -3,6 +3,7 @@ import pytest
 from backend.core.sandbox_policy import (
     build_container_security_options,
     managed_container_filters,
+    require_gvisor_runtime,
     validate_clone_url,
 )
 
@@ -58,6 +59,23 @@ def test_network_access_requires_explicit_install_policy_opt_in():
 def test_untrusted_execution_cannot_select_the_standard_runc_runtime():
     with pytest.raises(ValueError, match="runsc"):
         build_container_security_options({"runtime": "runc"})
+
+
+def test_runtime_check_fails_when_gvisor_is_not_installed():
+    with pytest.raises(RuntimeError, match="gVisor"):
+        require_gvisor_runtime({"runc": {"path": "runc"}})
+
+
+def test_runtime_check_rejects_attempted_downgrade_even_when_gvisor_exists():
+    with pytest.raises(RuntimeError, match="gVisor"):
+        require_gvisor_runtime(
+            {"runsc": {"path": "runsc"}, "runc": {"path": "runc"}},
+            requested_runtime="runc",
+        )
+
+
+def test_runtime_check_accepts_only_configured_gvisor():
+    require_gvisor_runtime({"runsc": {"path": "runsc"}})
 
 
 def test_cleanup_filters_only_containers_owned_by_this_sandbox_manager():
