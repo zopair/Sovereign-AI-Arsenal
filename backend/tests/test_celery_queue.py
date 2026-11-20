@@ -132,15 +132,17 @@ def test_analysis_payload_validation_requires_uuid_and_boolean_flag():
         _validate_analysis_payload("d9428888-122b-4d1c-a3b1-50a3b4bffea9", "false")
 
 
-def test_invalid_task_payloads_are_excluded_from_automatic_retries():
+def test_invalid_task_payloads_fail_immediately_without_retry():
     from backend.core.repository_tasks import (
         InvalidTaskPayload,
         analyze_repository_task,
         discover_repositories_task,
     )
 
-    assert InvalidTaskPayload in discover_repositories_task.dont_autoretry_for
-    assert InvalidTaskPayload in analyze_repository_task.dont_autoretry_for
+    with pytest.raises(InvalidTaskPayload):
+        discover_repositories_task.run([""], 10, False)
+    with pytest.raises(InvalidTaskPayload):
+        analyze_repository_task.run("../../etc/passwd", False)
 
 
 def test_api_routes_enqueue_durable_tasks_and_expose_task_status():
