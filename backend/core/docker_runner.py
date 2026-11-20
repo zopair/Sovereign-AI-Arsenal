@@ -259,7 +259,7 @@ class DockerSandboxManager:
         
         try:
             for file_path in repo_path.rglob('*'):
-                if not is_safe_repo_path(path, file_path):
+                if not is_safe_repo_path(repo_path, file_path):
                     continue
                 if file_path.is_file():
                     # Skip hidden files and very large files
@@ -311,7 +311,7 @@ class DockerSandboxManager:
             ]
             
             for file_path in repo_path.rglob('*'):
-                if not is_safe_repo_path(path, file_path):
+                if not is_safe_repo_path(repo_path, file_path):
                     continue
                 if file_path.is_file() and not file_path.name.startswith('.'):
                     try:
@@ -632,7 +632,7 @@ class DockerSandboxManager:
             file_count = 0
             
             for file_path in repo_path.rglob('*'):
-                if not is_safe_repo_path(path, file_path):
+                if not is_safe_repo_path(repo_path, file_path):
                     continue
                 if file_path.is_file() and file_path.suffix in ['.py', '.js', '.ts', '.java', '.cpp', '.c']:
                     try:
