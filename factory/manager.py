@@ -89,8 +89,9 @@ def github_get(
                 return json.load(response)
         except urllib.error.HTTPError as error:
             remaining = (error.headers or {}).get("X-RateLimit-Remaining")
+            retry_after = (error.headers or {}).get("Retry-After")
             retryable = error.code == 429 or (
-                error.code == 403 and remaining == "0"
+                error.code == 403 and (remaining == "0" or retry_after is not None)
             ) or error.code >= 500
             if not retryable or attempt + 1 >= max_attempts:
                 raise
