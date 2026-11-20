@@ -27,16 +27,14 @@ class VectorStore:
             self.client = chromadb.PersistentClient(path=persist_directory)
             collection_name = self.config.get('collection_name', 'ai_repositories')
             
-            # Get or create collection
-            try:
-                self.collection = self.client.get_collection(name=collection_name)
-                logger.info(f"Connected to existing collection: {collection_name}")
-            except chromadb.exceptions.CollectionNotFound:
-                self.collection = self.client.create_collection(
-                    name=collection_name,
-                    metadata={"description": "AI repository embeddings"}
-                )
-                logger.info(f"Created new collection: {collection_name}")
+            # ChromaDB's public API uses get_or_create_collection for
+            # idempotent startup; missing-collection exceptions are not a
+            # stable public namespace across ChromaDB releases.
+            self.collection = self.client.get_or_create_collection(
+                name=collection_name,
+                metadata={"description": "AI repository embeddings"},
+            )
+            logger.info("Connected to or created collection: %s", collection_name)
             
             # Initialize embedding model
             model_name = self.config.get('embedding_model', 'all-MiniLM-L6-v2')

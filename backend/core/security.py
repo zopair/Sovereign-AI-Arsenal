@@ -137,7 +137,7 @@ class SecureTokenManager:
         
         return data[:visible_chars] + mask_char * (len(data) - visible_chars)
     
-    def validate_github_token_scope(self, token: str) -> bool:
+    async def validate_github_token_scope(self, token: str) -> bool:
         """Validate GitHub token has required scopes"""
         try:
             import aiohttp
