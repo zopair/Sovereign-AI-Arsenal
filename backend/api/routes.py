@@ -195,7 +195,7 @@ async def get_repository(repo_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/discover")
-async def discover_repositories(
+def discover_repositories(
     queries: Optional[List[str]] = Query(None),
     max_repos_per_query: int = Query(100, ge=1, le=500),
     auto_analyze: bool = Query(True),
@@ -216,7 +216,7 @@ async def discover_repositories(
         raise HTTPException(status_code=503, detail="Repository worker is unavailable")
 
 @router.post("/repositories/{repo_id}/analyze")
-async def analyze_repository(
+def analyze_repository(
     repo_id: str,
     force_reanalyze: bool = Query(False),
     db: Session = Depends(get_db),
@@ -244,7 +244,7 @@ async def analyze_repository(
 
 
 @router.get("/tasks/{task_id}")
-async def get_task_status(task_id: str):
+def get_task_status(task_id: str):
     """Return a bounded status view for a Celery task ID."""
     try:
         normalized_task_id = str(uuid.UUID(task_id))
