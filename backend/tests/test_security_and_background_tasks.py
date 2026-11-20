@@ -202,7 +202,8 @@ def test_cryptography_pin_is_a_published_release():
     requirements = (
         Path(__file__).resolve().parents[1] / "requirements.txt"
     ).read_text(encoding="utf-8")
-    assert "cryptography==41.0.7" in requirements
+    assert "cryptography==50.0.2" in requirements
+    assert "cryptography==41.0.7" not in requirements
     assert "cryptography==41.0.8" not in requirements
 
 
