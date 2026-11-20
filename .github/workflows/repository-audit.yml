@@ -1,6 +1,12 @@
 name: Scheduled Repository Audit
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "factory/batch.py"
+      - "factory/repository_targets.json"
+      - ".github/workflows/repository-audit.yml"
   schedule:
     - cron: "30 3 * * *"
   workflow_dispatch:
