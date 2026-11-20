@@ -203,7 +203,7 @@ def discover_repositories(
     """Queue repository discovery for the dedicated worker process."""
     try:
         task = discover_repositories_task.apply_async(
-            args=(queries or [], max_repos_per_query, auto_analyze),
+            args=(queries, max_repos_per_query, auto_analyze),
             queue="repository",
         )
         return {
