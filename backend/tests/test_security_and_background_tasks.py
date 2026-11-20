@@ -192,7 +192,7 @@ def test_sandbox_workflow_uses_supported_artifacts_and_exposes_test_outputs():
     root = Path(__file__).resolve().parents[2]
     workflow = (root / ".github" / "workflows" / "sandbox-test.yml").read_text(encoding="utf-8")
 
-    assert "uses: actions/upload-artifact@v4" in workflow
+    assert "uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in workflow
     assert "actions/upload-artifact@v3" not in workflow
     assert 'RESULTS="$(cat /tmp/sandbox_test_results.json)"' in workflow
     assert "steps.test.outputs.results" not in workflow
