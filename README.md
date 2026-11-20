@@ -33,21 +33,19 @@ Sovereign AI Arsenal brings repository discovery, multi-dimensional evaluation, 
 ```mermaid
 flowchart TB
     Client[Users and Integrations] --> API[FastAPI Application]
-    API --> Discovery[Repository Discovery]
-    API --> Analysis[Evaluation and Classification]
-    API --> Trends[Trend Analytics]
-    API --> Search[Semantic Search]
+    API --> Queue[(Redis AOF Task Queue)]
+    Queue --> Worker[Celery Worker]
+    Worker --> Discovery[Repository Discovery]
+    Worker --> Analysis[Evaluation and Classification]
+    Worker --> Trends[Trend Analytics]
     Discovery --> GitHub[GitHub API]
     Analysis --> Router[Optional LLM Provider Router]
     Router --> P1[Configured Provider A]
     Router --> P2[Configured Provider B]
-    API --> DB[(PostgreSQL)]
-    API --> Queue[(Redis AOF Task Queue)]
-    Queue --> Worker[Celery Worker]
-    Worker --> GitHub[GitHub API]
-    Worker --> Analysis
-    Worker --> DB
+    Worker --> DB[(PostgreSQL)]
     Worker --> Vector[(Persistent Vector Store)]
+    API --> DB
+    API --> Search[Semantic Search]
     Search --> Vector
     API --> Metrics[Metrics and Monitoring]
 ```
