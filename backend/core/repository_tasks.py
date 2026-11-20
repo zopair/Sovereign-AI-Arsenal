@@ -68,6 +68,12 @@ def _ensure_vector_store() -> None:
     module.init_vector_store(config.get("vector_store", {}))
 
 
+@celery_app.task(name="backend.health_ping", ignore_result=False)
+def worker_health_ping() -> dict[str, str]:
+    """Lightweight broker/worker smoke task; performs no external I/O."""
+    return {"status": "ok"}
+
+
 @celery_app.task(
     bind=True,
     name="backend.repository_discovery",
