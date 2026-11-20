@@ -24,6 +24,7 @@ Sovereign AI Arsenal brings repository discovery, multi-dimensional evaluation, 
 - **Semantic search:** vector-backed discovery capabilities.
 - **API-first integration:** FastAPI endpoints and interactive API documentation.
 - **Provider-neutral inference:** optional OpenAI-compatible chat gateway with cooldowns and failover.
+- **Durable repository jobs:** Celery worker with Redis AOF persistence, bounded retries, task status, and PostgreSQL-backed repository records.
 - **Operational foundations:** Docker Compose, PostgreSQL, Redis, and monitoring components.
 - **Repository sandbox module (not yet API-integrated):** gVisor-required execution policy with network disabled by default; see [Sandbox Security](docs/SANDBOX_SECURITY.md).
 
@@ -32,21 +33,24 @@ Sovereign AI Arsenal brings repository discovery, multi-dimensional evaluation, 
 ```mermaid
 flowchart TB
     Client[Users and Integrations] --> API[FastAPI Application]
-    API --> Discovery[Repository Discovery]
-    API --> Analysis[Evaluation and Classification]
-    API --> Trends[Trend Analytics]
-    API --> Search[Semantic Search]
+    API --> Queue[(Redis AOF Task Queue)]
+    Queue --> Worker[Celery Worker]
+    Worker --> Discovery[Repository Discovery]
+    Worker --> Analysis[Evaluation and Classification]
+    Worker --> Trends[Trend Analytics]
     Discovery --> GitHub[GitHub API]
     Analysis --> Router[Optional LLM Provider Router]
     Router --> P1[Configured Provider A]
     Router --> P2[Configured Provider B]
-    API --> DB[(PostgreSQL)]
-    API --> Cache[(Redis)]
-    Search --> Vector[(Vector Store)]
+    Worker --> DB[(PostgreSQL)]
+    Worker --> Vector[(Persistent Vector Store)]
+    API --> DB
+    API --> Search[Semantic Search]
+    Search --> Vector
     API --> Metrics[Metrics and Monitoring]
 ```
 
-The provider router is optional and remains disabled until configured. Failover is between distinct providers; duplicate credentials must not be used to bypass a provider's published quotas.
+The provider router is optional and remains disabled until configured. Failover is between distinct providers; duplicate credentials must not be used to bypass a provider's published quotas. Repository discovery and analysis are queued to a dedicated Celery worker; see [Task Execution](docs/TASK_EXECUTION.md) for retry and persistence boundaries.
 
 ## Quick start
 
@@ -98,6 +102,12 @@ set +a
 PYTHONPATH=. uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
+## Background task execution
+
+Repository discovery and analysis run through a dedicated Celery worker. The API returns a task ID immediately; poll GET /api/v1/tasks/{task_id} to inspect its state. The worker shares the existing Redis and PostgreSQL services and does not expose a public port.
+
+See [Task Execution](docs/TASK_EXECUTION.md) for queue behavior, retry limits, persistence, and operational caveats.
+
 ## LLM Provider Router
 
 The optional gateway exposes:
@@ -144,7 +154,7 @@ The pull-request checks validate focused regressions and the backend container b
 
 | Area | Current status |
 |---|---|
-| Repository discovery and analysis | Modular PoC foundation |
+| Repository discovery and analysis | Celery/Redis worker with bounded exception retries; verify worker health and backups in deployment |
 | API and containerization | Implemented; validate deployment configuration |
 | LLM provider routing | Implemented for non-streaming chat; integration credentials required |
 | Shared provider state across workers | Not implemented; cooldown state is process-local |

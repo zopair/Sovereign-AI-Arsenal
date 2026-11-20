@@ -4,7 +4,7 @@ from typing import List, Dict, Optional, Any
 import logging
 from sentence_transformers import SentenceTransformer
 import json
-import os
+from pathlib import Path
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -21,10 +21,14 @@ class VectorStore:
         """Initialize ChromaDB client and embedding model"""
         try:
             # Initialize ChromaDB
-            persist_directory = self.config.get('persist_directory', 'data/vectors')
-            os.makedirs(persist_directory, exist_ok=True)
-            
-            self.client = chromadb.PersistentClient(path=persist_directory)
+            persist_directory = Path(
+                self.config.get('persist_directory', 'data/vectors')
+            )
+            if not persist_directory.is_absolute():
+                persist_directory = Path(__file__).resolve().parents[1] / persist_directory
+            persist_directory.mkdir(parents=True, exist_ok=True)
+
+            self.client = chromadb.PersistentClient(path=str(persist_directory))
             collection_name = self.config.get('collection_name', 'ai_repositories')
             
             # ChromaDB's public API uses get_or_create_collection for
@@ -63,7 +67,7 @@ class VectorStore:
             }
             
             # Add to collection
-            self.collection.add(
+            self.collection.upsert(
                 embeddings=[embedding.tolist()],
                 documents=[content],
                 metadatas=[repo_metadata],
@@ -137,10 +141,7 @@ class VectorStore:
                                  metadata: Dict[str, Any] = None):
         """Update repository embedding"""
         try:
-            # Remove existing embedding
-            self.collection.delete(ids=[repo_id])
-            
-            # Add new embedding
+            # Upsert replaces the existing record without a delete/add gap.
             self.add_repository_embedding(repo_id, content, metadata)
             
             logger.info(f"Updated embedding for repository: {repo_id}")
@@ -195,7 +196,7 @@ class VectorStore:
                 embeddings.append(embedding.tolist())
             
             # Add to collection
-            self.collection.add(
+            self.collection.upsert(
                 embeddings=embeddings,
                 documents=documents,
                 metadatas=metadatas,

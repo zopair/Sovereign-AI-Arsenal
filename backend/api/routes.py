@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
@@ -6,6 +6,9 @@ import logging
 from pathlib import Path
 from types import SimpleNamespace
 from datetime import datetime, timedelta
+import uuid
+
+from celery.result import AsyncResult
 
 from ..database.db import get_db, db as database
 from ..database.models import Repository, Classification, Trend
@@ -16,6 +19,8 @@ from ..core.scorer import RepositoryScorer
 from ..core.trend_engine import TrendAnalysisEngine
 from ..core.llm_analyzer import LLMAnalyzer
 from ..database.vector_store import get_vector_store
+from ..core.celery_app import celery_app
+from ..core.repository_tasks import analyze_repository_task, discover_repositories_task
 
 logger = logging.getLogger(__name__)
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
@@ -190,59 +195,69 @@ async def get_repository(repo_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/discover")
-async def discover_repositories(
-    background_tasks: BackgroundTasks,
+def discover_repositories(
     queries: Optional[List[str]] = Query(None),
     max_repos_per_query: int = Query(100, ge=1, le=500),
     auto_analyze: bool = Query(True),
-    db: Session = Depends(get_db)
 ):
-    """Discover new AI repositories"""
+    """Queue repository discovery for the dedicated worker process."""
     try:
-        discovery_engine = get_discovery_engine()
-        
-        # Start discovery in background
-        background_tasks.add_task(
-            discover_and_analyze_repositories,
-            discovery_engine,
-            queries,
-            max_repos_per_query,
-            auto_analyze,
+        task = discover_repositories_task.apply_async(
+            args=(queries, max_repos_per_query, auto_analyze),
+            queue="repository",
         )
-        
-        return {"message": "Repository discovery started", "status": "processing"}
-        
-    except Exception as e:
-        logger.error(f"Error starting repository discovery: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return {
+            "message": "Repository discovery queued",
+            "task_id": task.id,
+            "status": "queued",
+        }
+    except Exception:
+        logger.exception("Error queuing repository discovery")
+        raise HTTPException(status_code=503, detail="Repository worker is unavailable")
 
 @router.post("/repositories/{repo_id}/analyze")
-async def analyze_repository(
+def analyze_repository(
     repo_id: str,
-    background_tasks: BackgroundTasks,
     force_reanalyze: bool = Query(False),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Trigger comprehensive analysis of a repository"""
+    """Queue a repository analysis and return its task identifier."""
     try:
         repository = db.query(Repository).filter(Repository.id == repo_id).first()
         if not repository:
             raise HTTPException(status_code=404, detail="Repository not found")
-        
-        # Start analysis in background
-        background_tasks.add_task(
-            perform_comprehensive_analysis,
-            str(repository.id),
-            force_reanalyze,
+
+        task = analyze_repository_task.apply_async(
+            args=(str(repository.id), force_reanalyze),
+            queue="repository",
         )
-        
-        return {"message": "Repository analysis started", "status": "processing"}
-        
+        return {
+            "message": "Repository analysis queued",
+            "task_id": task.id,
+            "status": "queued",
+        }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error starting repository analysis: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    except Exception:
+        logger.exception("Error queuing repository analysis")
+        raise HTTPException(status_code=503, detail="Repository worker is unavailable")
+
+
+@router.get("/tasks/{task_id}")
+def get_task_status(task_id: str):
+    """Return a bounded status view for a Celery task ID."""
+    try:
+        normalized_task_id = str(uuid.UUID(task_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid task identifier")
+
+    task = AsyncResult(normalized_task_id, app=celery_app)
+    response = {"task_id": normalized_task_id, "status": task.state.lower()}
+    if task.successful():
+        response["result"] = task.result
+    elif task.failed():
+        response["error"] = "Task failed; inspect worker logs for details"
+    return response
 
 @router.get("/search")
 async def search_repositories(
@@ -461,6 +476,8 @@ async def discover_and_analyze_repositories(
     """Discover repositories; each unit of DB work owns a short-lived session."""
     try:
         repositories = await discovery_engine.discover_ai_repositories(queries, max_repos_per_query)
+        processed_count = 0
+        failed_count = 0
 
         for repo_data in repositories:
             try:
@@ -509,14 +526,27 @@ async def discover_and_analyze_repositories(
                 if auto_analyze:
                     await perform_comprehensive_analysis(repository_id, False)
 
+                processed_count += 1
             except Exception:
+                failed_count += 1
                 logger.exception("Error processing discovered repository %s", repo_data.get("full_name", "unknown"))
                 continue
 
-        logger.info("Processed %s discovered repositories", len(repositories))
+        logger.info(
+            "Processed %s of %s discovered repositories; %s failed",
+            processed_count,
+            len(repositories),
+            failed_count,
+        )
+        return {
+            "discovered": len(repositories),
+            "processed": processed_count,
+            "failed": failed_count,
+        }
 
     except Exception:
-        logger.exception("Repository discovery background task failed")
+        logger.exception("Repository discovery worker task failed")
+        raise
 
 async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
     """Analyze a repository without retaining a DB session during network/model work."""
@@ -524,11 +554,11 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
         with database.get_session() as session:
             repository = session.query(Repository).filter(Repository.id == repo_id).first()
             if not repository:
-                return
+                return {"repository_id": repo_id, "status": "not_found"}
 
             if not force_reanalyze and repository.last_analyzed:
                 if (datetime.utcnow() - repository.last_analyzed).days < 1:
-                    return
+                    return {"repository_id": repo_id, "status": "already_fresh"}
 
             repository_snapshot = {
                 "id": repository.github_id,
@@ -559,6 +589,24 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
         scores = get_scorer().calculate_composite_score(repo_data, repo_metrics)
         trend_analysis = get_trend_engine().analyze_repository_trends(repo_data)
 
+        # Upsert the vector before committing last_analyzed. A retry after a
+        # vector-store failure must not be short-circuited by the freshness guard.
+        if readme:
+            get_vector_store().add_repository_embedding(
+                repo_id,
+                readme,
+                {
+                    "name": repository_snapshot["name"],
+                    "full_name": repository_snapshot["full_name"],
+                    "language": repository_snapshot["language"],
+                    "stars": repository_snapshot["stargazers_count"],
+                    "updated_at": repository_snapshot["updated_at"],
+                },
+            )
+
+        analysis_time = datetime.utcnow()
+        trend_date = analysis_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
         with database.get_session() as session:
             repository = session.query(Repository).filter(Repository.id == repo_id).first()
             if not repository:
@@ -567,7 +615,7 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
             repository.score = scores.get("overall_score", 0.0)
             repository.trend_score = scores.get("trend_score", 0.0)
             repository.ai_relevance_score = evaluation.get("ai_relevance_score", 0.0)
-            repository.last_analyzed = datetime.utcnow()
+            repository.last_analyzed = analysis_time
 
             existing_classifications = session.query(Classification).filter(
                 Classification.repository_id == repo_id
@@ -587,33 +635,29 @@ async def perform_comprehensive_analysis(repo_id: str, force_reanalyze: bool):
                 ))
 
             if trend_analysis:
-                session.add(Trend(
-                    repository_id=repo_id,
-                    date=datetime.utcnow(),
-                    stars=repository.stargazers_count,
-                    forks=repository.forks_count,
-                    contributors=repo_metrics.get("contributors_count", 0),
-                    commits=repo_metrics.get("commits_30_days", 0),
-                    weekly_growth_rate=repo_metrics.get("weekly_growth_rate", 0.0),
-                    trend_score=trend_analysis.get("trend_metrics", {}).get("trend_strength", 0.0),
-                ))
+                trend = session.query(Trend).filter(
+                    Trend.repository_id == repo_id,
+                    Trend.date >= trend_date,
+                    Trend.date < trend_date + timedelta(days=1),
+                ).first()
+                if trend is None:
+                    trend = Trend(repository_id=repo_id, date=trend_date)
+                    session.add(trend)
+
+                trend.stars = repository.stargazers_count
+                trend.forks = repository.forks_count
+                trend.contributors = repo_metrics.get("contributors_count", 0)
+                trend.commits = repo_metrics.get("commits_30_days", 0)
+                trend.weekly_growth_rate = repo_metrics.get("weekly_growth_rate", 0.0)
+                trend.trend_score = trend_analysis.get("trend_metrics", {}).get(
+                    "trend_strength", 0.0
+                )
 
             session.commit()
 
-        if readme:
-            get_vector_store().add_repository_embedding(
-                repo_id,
-                readme,
-                {
-                    "name": repository_snapshot["name"],
-                    "full_name": repository_snapshot["full_name"],
-                    "language": repository_snapshot["language"],
-                    "stars": repository_snapshot["stargazers_count"],
-                    "updated_at": repository_snapshot["updated_at"],
-                },
-            )
-
         logger.info("Completed analysis for repository %s", repository_snapshot["full_name"])
+        return {"repository_id": repo_id, "status": "completed"}
 
     except Exception:
-        logger.exception("Repository analysis background task failed for %s", repo_id)
+        logger.exception("Repository analysis worker task failed for %s", repo_id)
+        raise

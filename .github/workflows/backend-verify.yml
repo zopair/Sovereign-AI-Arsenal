@@ -34,7 +34,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install focused test runner
-        run: python -m pip install --disable-pip-version-check pytest pytest-asyncio httpx
+        run: python -m pip install --disable-pip-version-check pytest pytest-asyncio httpx celery==5.3.4 redis==5.0.1 pyyaml==6.0.1
       - name: Compile backend Python modules
         run: python -m compileall -q backend
       - name: Run security and route regression tests
@@ -47,6 +47,7 @@ jobs:
           backend/tests/test_vector_store_compatibility.py
           backend/tests/test_provider_router.py
           backend/tests/test_sandbox_policy.py
+          backend/tests/test_celery_queue.py
   container-build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -64,10 +65,27 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - name: Validate Docker Compose configuration
+        env:
+          POSTGRES_ADMIN_PASSWORD: ci-only-admin-password
+          DB_PASSWORD: ci-only-password
+          API_AUTH_TOKEN: ci-only-token
+          GRAFANA_ADMIN_PASSWORD: ci-only-grafana-password
+        run: docker compose config --quiet
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
       - name: Build backend image
@@ -89,9 +107,10 @@ jobs:
             -e DB_USER=app_user \
             -e DB_PASSWORD=smoke-db-password \
             -e API_AUTH_TOKEN=smoke-test-key \
+            -e REDIS_URL=redis://127.0.0.1:6379/0 \
             -e LOG_DIR=/tmp/sovereign-backend-smoke-logs \
             sovereign-ai-arsenal-backend:ci
-      - name: Verify health and API authentication
+      - name: Verify backend health
         run: |
           healthy=false
           for _ in $(seq 1 90); do
@@ -106,7 +125,44 @@ jobs:
             docker logs backend-smoke || true
             exit 1
           fi
+      - name: Start Celery worker against disposable Redis
+        run: |
+          docker run -d --name worker-smoke --network host \
+            --entrypoint celery \
+            -e DB_HOST=127.0.0.1 \
+            -e DB_PORT=5432 \
+            -e DB_NAME=sovereign_ai_smoke \
+            -e DB_USER=app_user \
+            -e DB_PASSWORD=smoke-db-password \
+            -e REDIS_URL=redis://127.0.0.1:6379/0 \
+            sovereign-ai-arsenal-backend:ci \
+            -A backend.core.celery_app:celery_app worker \
+            --loglevel=INFO --concurrency=1 --queues=repository \
+            --hostname=smoke-worker@%h
+      - name: Verify end-to-end Celery task execution
+        run: |
+          docker exec backend-smoke python - <<'PY'
+          import time
+          from celery.result import AsyncResult
+          from backend.core.celery_app import celery_app
 
+          sent = celery_app.send_task("backend.health_ping", queue="repository")
+          deadline = time.time() + 45
+          while time.time() < deadline:
+              result = AsyncResult(sent.id, app=celery_app)
+              if result.successful():
+                  assert result.result == {"status": "ok"}, result.result
+                  print({"task_id": sent.id, "result": result.result})
+                  break
+              if result.failed():
+                  raise RuntimeError("Celery health task failed")
+              time.sleep(1)
+          else:
+              raise TimeoutError("Celery worker did not complete the health task")
+          PY
+
+      - name: Verify API authentication
+        run: |
           unauth_status=$(curl -sS -o /tmp/backend-unauth.json -w "%{http_code}" \
             http://127.0.0.1:8000/api/v1/statistics)
           if [ "$unauth_status" != "401" ]; then
@@ -129,6 +185,9 @@ jobs:
       - name: Print backend logs on failure
         if: failure()
         run: docker logs backend-smoke || true
-      - name: Remove smoke container
+      - name: Print worker logs on failure
+        if: failure()
+        run: docker logs worker-smoke || true
+      - name: Remove smoke containers
         if: always()
-        run: docker rm -f backend-smoke || true
+        run: docker rm -f backend-smoke worker-smoke || true

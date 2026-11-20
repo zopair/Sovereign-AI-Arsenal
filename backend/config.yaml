@@ -12,7 +12,7 @@ database:
 
 github:
   api_url: "https://api.github.com"
-  token: ${GITHUB_TOKEN}
+  token: ""
   rate_limit:
     requests_per_hour: 5000
     retry_after: 60
