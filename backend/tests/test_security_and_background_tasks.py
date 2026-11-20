@@ -282,6 +282,15 @@ def test_sandbox_workflow_rejects_installation_and_test_failures():
     assert 'if [ "$TEST_SUCCESS" = "false" ]' in workflow
 
 
+def test_gvisor_integration_workflow_is_opt_in_until_a_runsc_runner_is_available():
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows" / "sandbox-test.yml").read_text(encoding="utf-8")
+
+    assert "enable_gvisor_integration:" in workflow
+    assert "default: false" in workflow
+    assert "inputs.enable_gvisor_integration == true" in workflow
+
+
 def test_sandbox_pulls_missing_base_image_before_container_creation():
     runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
     tree = ast.parse(runner_path.read_text(encoding="utf-8"))
