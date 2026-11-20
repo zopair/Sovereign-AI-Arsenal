@@ -21,6 +21,7 @@ from .sandbox_policy import (
     build_container_security_options,
     managed_container_filters,
     require_gvisor_runtime,
+    is_safe_repo_path,
     validate_clone_url,
 )
 
@@ -258,6 +259,8 @@ class DockerSandboxManager:
         
         try:
             for file_path in repo_path.rglob('*'):
+                if not is_safe_repo_path(path, file_path):
+                    continue
                 if file_path.is_file():
                     # Skip hidden files and very large files
                     if file_path.name.startswith('.') or file_path.stat().st_size > self.max_file_size:
@@ -308,6 +311,8 @@ class DockerSandboxManager:
             ]
             
             for file_path in repo_path.rglob('*'):
+                if not is_safe_repo_path(path, file_path):
+                    continue
                 if file_path.is_file() and not file_path.name.startswith('.'):
                     try:
                         # Check filename
@@ -627,6 +632,8 @@ class DockerSandboxManager:
             file_count = 0
             
             for file_path in repo_path.rglob('*'):
+                if not is_safe_repo_path(path, file_path):
+                    continue
                 if file_path.is_file() and file_path.suffix in ['.py', '.js', '.ts', '.java', '.cpp', '.c']:
                     try:
                         file_size = file_path.stat().st_size
@@ -688,6 +695,8 @@ class DockerSandboxManager:
         total_size = 0
         try:
             for file_path in path.rglob('*'):
+                if not is_safe_repo_path(path, file_path):
+                    continue
                 if file_path.is_file():
                     total_size += file_path.stat().st_size
         except Exception as e:
