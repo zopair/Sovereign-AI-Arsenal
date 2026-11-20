@@ -47,6 +47,7 @@
 - Workflow المسمى CI ينفذ echo فقط ولا يبني المشروع ولا يشغل اختبارات.
 - بعض مسارات V3/V4 وملفات API عبارة عن stubs أو placeholders.
 - personal-agent/worker/src/index.ts أكثر الأجزاء قابلية لإعادة الاستخدام: Worker يستقبل مهاماً، يخزنها في D1/Queue، ثم يطلق GitHub Actions workflow.
+- الـ workflow الذي تمت معاينته لا ينفذ مهمة ذكاء اصطناعي بعد؛ هو يسجل نص المهمة كبيانات ويرفعه كـ Artifact. لذلك فهذا Dispatch/Queue scaffold وليس وكيل تنفيذ مكتمل.
 - فحص مقارنة التوكن في Worker يحتاج تحسيناً: الاعتماد على crypto.subtle.timingSafeEqual ليس ضماناً متاحاً في Web Crypto القياسي؛ يجب استخدام مقارنة ثابتة الزمن متوافقة مع بيئة التشغيل واختبارها.
 
 **القرار:** استخراج personal-agent/worker كخدمة تنفيذ مهام مستقلة بعد إضافة اختبارات وتوثيق وتشغيل فعلي. عدم اعتماد الجذر كتطبيق Next.js قبل إصلاح manifests والـ CI.
