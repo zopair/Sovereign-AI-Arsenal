@@ -13,6 +13,12 @@ on:
       - 'backend/requirements.txt'
       - '.github/workflows/sandbox-test.yml'
   workflow_dispatch:
+    inputs:
+      enable_gvisor_integration:
+        description: "Run Docker sandbox integration on a runner with gVisor runsc preinstalled"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -31,7 +37,7 @@ jobs:
         run: ruby -e "require 'yaml'; YAML.load_file('.github/workflows/sandbox-test.yml')"
 
   sandbox-test:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' && inputs.enable_gvisor_integration == true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     
