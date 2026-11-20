@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import yaml
+
 
 def test_celery_uses_existing_redis_and_restricts_task_payloads_to_json(monkeypatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/3")
@@ -104,24 +106,30 @@ def test_api_routes_enqueue_durable_tasks_and_expose_task_status():
 
 
 def test_compose_runs_a_separate_worker_against_the_existing_redis_and_postgres():
-    compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text(
-        encoding="utf-8"
-    )
+    compose_path = Path(__file__).resolve().parents[2] / "docker-compose.yml"
+    compose = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+    services = compose["services"]
+    worker = services["worker"]
 
-    assert "  worker:" in compose
-    assert "backend.core.celery_app:celery_app" in compose
-    assert "REDIS_URL: redis://redis:6379/0" in compose
-    assert "backend_data:/app/backend/data" in compose
-    assert "--concurrency=1" in compose
+    assert worker["image"] == services["backend"]["image"]
+    assert worker["command"][:4] == [
+        "celery", "-A", "backend.core.celery_app:celery_app", "worker"
+    ]
+    assert "--concurrency=1" in worker["command"]
+    assert "--queues=repository" in worker["command"]
+    assert worker["environment"]["REDIS_URL"] == "redis://redis:6379/0"
+    assert "backend_data:/app/backend/data" in worker["volumes"]
+    assert worker["environment"]["HF_HOME"] == services["backend"]["environment"]["HF_HOME"]
+    assert services["redis"]["command"][-2:] == ["--appendfsync", "always"]
+    assert worker["depends_on"]["postgres"]["condition"] == "service_healthy"
+    assert worker["depends_on"]["redis"]["condition"] == "service_healthy"
 
 
-def test_github_token_is_not_left_as_an_unexpanded_yaml_placeholder():
-    config = (Path(__file__).resolve().parents[1] / "config.yaml").read_text(
-        encoding="utf-8"
-    )
+def test_github_token_is_read_from_environment_not_an_unexpanded_yaml_placeholder():
+    config_path = Path(__file__).resolve().parents[1] / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
-    assert "token: \"\"" in config
-    assert "${GITHUB_TOKEN}" not in config
+    assert config["github"]["token"] == ""
 
 
 def test_vector_store_resolves_relative_persistence_under_the_mounted_backend_data_directory():
