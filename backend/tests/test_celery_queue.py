@@ -124,6 +124,15 @@ def test_github_token_is_not_left_as_an_unexpanded_yaml_placeholder():
     assert "${GITHUB_TOKEN}" not in config
 
 
+def test_vector_store_resolves_relative_persistence_under_the_mounted_backend_data_directory():
+    source = (
+        Path(__file__).resolve().parents[1] / "database" / "vector_store.py"
+    ).read_text(encoding="utf-8")
+
+    assert "Path(__file__).resolve().parents[1] / persist_directory" in source
+    assert "chromadb.PersistentClient(path=str(persist_directory))" in source
+
+
 def test_vector_store_embedding_writes_are_idempotent_for_task_retries():
     source = (
         Path(__file__).resolve().parents[1] / "database" / "vector_store.py"
