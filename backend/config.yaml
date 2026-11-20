@@ -67,3 +67,17 @@ monitoring:
   enable_metrics: true
   metrics_port: 9090
   health_check_interval: 30
+sandbox:
+  # Untrusted repository code must never fall back to the default runc runtime.
+  runtime: "runsc"
+  # Dependency installation executes repository-controlled package hooks.
+  # Keep disabled unless the repository and its dependency chain are reviewed.
+  allow_network_for_install: false
+  timeout: 300
+  memory_limit: "512m"
+  cpu_limit: "1.0"
+  max_file_size: 52428800
+  allowed_domains:
+    - github.com
+    - pypi.org
+    - files.pythonhosted.org

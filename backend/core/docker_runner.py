@@ -9,12 +9,21 @@ import tempfile
 import shutil
 import re
 import subprocess
+import shlex
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from pathlib import Path
 import hashlib
 import tarfile
 from dataclasses import dataclass
+
+from .sandbox_policy import (
+    build_container_security_options,
+    managed_container_filters,
+    require_gvisor_runtime,
+    is_safe_repo_path,
+    validate_clone_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +56,10 @@ class DockerSandboxManager:
         self.max_file_size = self.sandbox_config.get('max_file_size', 50 * 1024 * 1024)  # 50MB
         self.memory_limit = self.sandbox_config.get('memory_limit', '512m')
         self.cpu_limit = self.sandbox_config.get('cpu_limit', '1.0')
+        self.runtime = self.sandbox_config.get('runtime', 'runsc')
+        self.allow_network_for_install = bool(
+            self.sandbox_config.get('allow_network_for_install', False)
+        )
         
         # Security settings
         self.allowed_domains = self.sandbox_config.get('allowed_domains', [
@@ -64,6 +77,8 @@ class DockerSandboxManager:
             self.docker_client = docker.from_env()
             # Test daemon connectivity before attempting any image operations.
             self.docker_client.ping()
+            runtimes = self.docker_client.info().get('Runtimes', {})
+            require_gvisor_runtime(runtimes, self.runtime)
 
             # Ensure the configured execution image exists locally.
             try:
@@ -83,7 +98,19 @@ class DockerSandboxManager:
         start_time = datetime.utcnow()
         repo_id = str(repo_data.get('id', ''))
         clone_url = repo_data.get('clone_url', '')
-        repo_name = repo_data.get('full_name', '').replace('/', '_')
+        full_name = repo_data.get('full_name', '')
+        if not isinstance(full_name, str) or not re.fullmatch(
+            r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', full_name
+        ) or any(part in {'.', '..'} for part in full_name.split('/')):
+            result = SandboxResult(
+                repository_id=repo_id, clone_success=False, install_success=False,
+                test_success=False, setup_complexity_score=0.0,
+                execution_time_seconds=0.0, error_logs=['Invalid repository identity'],
+                test_output='', dependencies=[], file_structure={}, security_issues=[],
+                performance_metrics={}, sandbox_metadata={},
+            )
+            return result
+        repo_name = full_name.replace('/', '_')
         
         logger.info(f"Starting sandbox analysis for repository: {repo_name}")
         
@@ -133,10 +160,16 @@ class DockerSandboxManager:
                 result.error_logs.extend(install_result.get('errors', []))
                 
                 # Step 5: Run tests
-                test_result = await self._run_tests(repo_path)
-                result.test_success = test_result['success']
-                result.test_output = test_result.get('output', '')
-                result.error_logs.extend(test_result.get('errors', []))
+                if self.allow_network_for_install:
+                    test_result = await self._run_tests(repo_path)
+                    result.test_success = test_result['success']
+                    result.test_output = test_result.get('output', '')
+                    result.error_logs.extend(test_result.get('errors', []))
+                else:
+                    result.test_output = (
+                        'Test execution skipped: network access is disabled by default. '
+                        'Enable sandbox.allow_network_for_install only for reviewed repositories.'
+                    )
                 
                 # Step 6: Calculate setup complexity score
                 result.setup_complexity_score = await self._calculate_setup_complexity_score(
@@ -168,6 +201,7 @@ class DockerSandboxManager:
         """Clone repository using git"""
         result = {'success': False, 'errors': []}
         
+        process = None
         try:
             # Security check URL
             if not self._is_safe_url(clone_url):
@@ -201,6 +235,9 @@ class DockerSandboxManager:
                 logger.error(f"Failed to clone {repo_name}: {error_msg}")
         
         except asyncio.TimeoutError:
+            if process is not None and process.returncode is None:
+                process.kill()
+                await process.communicate()
             result['errors'].append("Clone operation timed out")
         except Exception as e:
             result['errors'].append(f"Clone error: {str(e)}")
@@ -222,6 +259,8 @@ class DockerSandboxManager:
         
         try:
             for file_path in repo_path.rglob('*'):
+                if not is_safe_repo_path(repo_path, file_path):
+                    continue
                 if file_path.is_file():
                     # Skip hidden files and very large files
                     if file_path.name.startswith('.') or file_path.stat().st_size > self.max_file_size:
@@ -272,6 +311,8 @@ class DockerSandboxManager:
             ]
             
             for file_path in repo_path.rglob('*'):
+                if not is_safe_repo_path(repo_path, file_path):
+                    continue
                 if file_path.is_file() and not file_path.name.startswith('.'):
                     try:
                         # Check filename
@@ -321,14 +362,14 @@ class DockerSandboxManager:
             
             # Python requirements.txt
             if (repo_path / 'requirements.txt').exists():
-                install_cmd = ['pip', 'install', '-r', 'requirements.txt']
+                install_cmd = ['python', '-m', 'pip', 'install', '--user', '-r', 'requirements.txt']
                 async with aiofiles.open(repo_path / 'requirements.txt', 'r') as f:
                     content = await f.read()
                     dependencies = [line.strip() for line in content.split('\n') if line.strip() and not line.startswith('#')]
             
             # setup.py
             elif (repo_path / 'setup.py').exists():
-                install_cmd = ['pip', 'install', '-e', '.']
+                install_cmd = ['python', '-m', 'pip', 'install', '--user', '.']
                 # Try to extract dependencies from setup.py
                 try:
                     async with aiofiles.open(repo_path / 'setup.py', 'r') as f:
@@ -361,31 +402,36 @@ class DockerSandboxManager:
                 result['dependencies'] = dependencies
                 return result
             
-            # Run installation in Docker container for security
+            # Do not execute package installation scripts with network access by default.
+            if not self.allow_network_for_install:
+                result['errors'].append(
+                    'Dependency installation skipped: network access is disabled by default'
+                )
+                result['dependencies'] = dependencies
+                return result
+
+            # Run installation in a gVisor container with bounded privileges.
             container = None
             try:
                 # Create container
                 container = self.docker_client.containers.create(
                     image=self.image_name,
-                    command=install_cmd,
-                    working_dir='/app',
-                    volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
-                    mem_limit=self.memory_limit,
-                    nano_cpus=int(float(self.cpu_limit) * 1_000_000_000),
-                        environment={
-                            'PYTHONDONTWRITEBYTECODE': '1',
-                            'PYTEST_ADDOPTS': '-p no:cacheprovider',
-                        },
-                    security_opt=['no-new-privileges'],
-                    read_only=False,  # Need write access for pip cache
-                    detach=True
+                    command=[
+                        'sh', '-lc',
+                        'mkdir -p /tmp/project && cp -a /app/. /tmp/project/ '
+                        '&& cd /tmp/project && exec ' + shlex.join(install_cmd),
+                    ],
+                    working_dir='/tmp',
+                    volumes={str(repo_path): {'bind': '/app', 'mode': 'ro'}},
+                    detach=True,
+                    **self._container_security_options(allow_network=True),
                 )
                 
                 # Start container
                 container.start()
                 
                 # Wait for completion
-                exit_code = container.wait(timeout=self.timeout)
+                exit_code = self._wait_for_container(container)
                 
                 if exit_code['StatusCode'] == 0:
                     result['success'] = True
@@ -417,6 +463,13 @@ class DockerSandboxManager:
         result = {'success': False, 'output': '', 'errors': []}
         
         try:
+            if not self.allow_network_for_install:
+                result['errors'].append(
+                    'Test execution skipped: network access is disabled by default'
+                )
+                result['output'] = 'Enable sandbox.allow_network_for_install only for reviewed repositories.'
+                return result
+
             # Look for test commands
             test_commands = []
             
@@ -451,34 +504,32 @@ class DockerSandboxManager:
             try:
                 for cmd in test_commands:
                     test_bootstrap = (
-                        'python -m pip install --disable-pip-version-check --upgrade pip && '
-                        'python -m pip install --disable-pip-version-check pytest && '
-                        'if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; '
-                        'elif [ -f setup.py ] || [ -f pyproject.toml ]; then python -m pip install -e .; fi && '
+                        'python -m pip install --user --disable-pip-version-check --upgrade pip && '
+                        'python -m pip install --user --disable-pip-version-check pytest && '
+                        'if [ -f requirements.txt ]; then python -m pip install --user -r requirements.txt; '
+                        'elif [ -f setup.py ] || [ -f pyproject.toml ]; then python -m pip install --user .; fi && '
                         'if [ -f pyproject.toml ] && grep -q "^\\\\[dependency-groups\\\\]" pyproject.toml '
                         '&& grep -q "^tests = \\\\[" pyproject.toml; then '
-                        'python -m pip install --group tests; fi && '
+                        'python -m pip install --user --group tests; fi && '
                     )
-                    test_command = ['sh', '-lc', test_bootstrap + ' '.join(cmd)]
+                    test_command = [
+                        'sh', '-lc',
+                        'mkdir -p /tmp/project && cp -a /app/. /tmp/project/ '
+                        '&& cd /tmp/project && ' + test_bootstrap + shlex.join(cmd),
+                    ]
                     container = self.docker_client.containers.create(
                         image=self.image_name,
                         command=test_command,
-                        working_dir='/app',
-                        volumes={str(repo_path): {'bind': '/app', 'mode': 'rw'}},
-                        mem_limit=self.memory_limit,
-                        nano_cpus=int(float(self.cpu_limit) * 1_000_000_000),
-                        environment={
-                            'PYTHONDONTWRITEBYTECODE': '1',
-                            'PYTEST_ADDOPTS': '-p no:cacheprovider',
-                        },
-                        security_opt=['no-new-privileges'],
-                        detach=True
+                        working_dir='/tmp',
+                        volumes={str(repo_path): {'bind': '/app', 'mode': 'ro'}},
+                        detach=True,
+                        **self._container_security_options(allow_network=True),
                     )
                     
                     container.start()
                     
                     # Wait for completion
-                    exit_code = container.wait(timeout=self.timeout)
+                    exit_code = self._wait_for_container(container)
                     logs = container.logs().decode('utf-8')
                     
                     if exit_code['StatusCode'] == 0:
@@ -581,6 +632,8 @@ class DockerSandboxManager:
             file_count = 0
             
             for file_path in repo_path.rglob('*'):
+                if not is_safe_repo_path(repo_path, file_path):
+                    continue
                 if file_path.is_file() and file_path.suffix in ['.py', '.js', '.ts', '.java', '.cpp', '.c']:
                     try:
                         file_size = file_path.stat().st_size
@@ -613,20 +666,37 @@ class DockerSandboxManager:
         
         return metrics
     
-    def _is_safe_url(self, url: str) -> bool:
-        """Check if URL is safe for cloning"""
+    def _container_security_options(self, *, allow_network: bool = False) -> Dict[str, Any]:
+        """Build the mandatory gVisor profile; no runc fallback is permitted."""
+        return build_container_security_options({
+            **self.sandbox_config,
+            'runtime': self.runtime,
+            'memory_limit': self.memory_limit,
+            'cpu_limit': self.cpu_limit,
+            'allow_network_for_install': allow_network,
+        })
+
+    def _wait_for_container(self, container):
         try:
-            from urllib.parse import urlparse
-            parsed = urlparse(url)
-            return parsed.netloc in self.allowed_domains
+            return container.wait(timeout=self.timeout)
         except Exception:
-            return False
+            try:
+                container.stop(timeout=5)
+            except Exception:
+                logger.warning('Unable to stop timed-out sandbox container')
+            raise
+
+    def _is_safe_url(self, url: str) -> bool:
+        """Accept only canonical HTTPS GitHub clone URLs on configured hosts."""
+        return validate_clone_url(url, set(self.allowed_domains))
     
     def _get_directory_size(self, path: Path) -> int:
         """Get total size of directory"""
         total_size = 0
         try:
             for file_path in path.rglob('*'):
+                if not is_safe_repo_path(path, file_path):
+                    continue
                 if file_path.is_file():
                     total_size += file_path.stat().st_size
         except Exception as e:
@@ -659,15 +729,17 @@ class DockerSandboxManager:
         try:
             if self.docker_client:
                 # Remove stopped containers
-                containers = self.docker_client.containers.list(all=True, filters={'status': 'exited'})
+                containers = self.docker_client.containers.list(
+                    all=True,
+                    filters={'status': 'exited', **managed_container_filters()},
+                )
                 for container in containers:
                     try:
                         container.remove()
                     except Exception as e:
                         logger.debug(f"Error removing container {container.id}: {e}")
                 
-                # Clean up unused images
-                self.docker_client.images.prune()
+                # Never prune images globally; the Docker daemon may be shared.
         except Exception as e:
             logger.error(f"Error during Docker cleanup: {e}")
 

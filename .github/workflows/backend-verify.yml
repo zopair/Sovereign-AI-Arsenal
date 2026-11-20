@@ -46,6 +46,7 @@ jobs:
           backend/tests/test_security_and_background_tasks.py
           backend/tests/test_vector_store_compatibility.py
           backend/tests/test_provider_router.py
+          backend/tests/test_sandbox_policy.py
   container-build:
     runs-on: ubuntu-latest
     timeout-minutes: 45

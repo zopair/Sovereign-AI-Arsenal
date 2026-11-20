@@ -251,16 +251,26 @@ def test_sandbox_docker_cpu_limit_uses_supported_nano_cpus_argument():
     ]
 
     assert len(create_calls) == 2
-    for call in create_calls:
-        keyword_names = {keyword.arg for keyword in call.keywords}
-        assert "nano_cpus" in keyword_names
-        assert "cpu_limit" not in keyword_names
+    assert all(
+        any(
+            keyword.arg is None
+            and isinstance(keyword.value, ast.Call)
+            and isinstance(keyword.value.func, ast.Attribute)
+            and keyword.value.func.attr == "_container_security_options"
+            for keyword in call.keywords
+        )
+        for call in create_calls
+    )
+    policy_path = Path(__file__).resolve().parents[1] / "core" / "sandbox_policy.py"
+    policy = policy_path.read_text(encoding="utf-8")
+    assert '"nano_cpus": int(cpu_limit * 1_000_000_000)' in policy
+    assert '"cpu_limit":' not in policy
 
 
 def test_sandbox_test_container_installs_pytest_before_invoking_it():
     runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
     source = runner_path.read_text(encoding="utf-8")
-    assert "python -m pip install --disable-pip-version-check pytest" in source
+    assert "python -m pip install --user --disable-pip-version-check pytest" in source
 
 
 def test_sandbox_workflow_rejects_installation_and_test_failures():
@@ -270,6 +280,15 @@ def test_sandbox_workflow_rejects_installation_and_test_failures():
     assert 'TEST_SUCCESS=$(printf' in workflow
     assert 'if [ "$INSTALL_SUCCESS" = "false" ]' in workflow
     assert 'if [ "$TEST_SUCCESS" = "false" ]' in workflow
+
+
+def test_gvisor_integration_workflow_is_opt_in_until_a_runsc_runner_is_available():
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows" / "sandbox-test.yml").read_text(encoding="utf-8")
+
+    assert "enable_gvisor_integration:" in workflow
+    assert "default: false" in workflow
+    assert "inputs.enable_gvisor_integration == true" in workflow
 
 
 def test_sandbox_pulls_missing_base_image_before_container_creation():
@@ -310,19 +329,17 @@ def test_sandbox_containers_disable_host_owned_python_and_pytest_caches():
 
     assert len(create_calls) == 2
     for call in create_calls:
-        environment = next(
-            keyword.value for keyword in call.keywords
-            if keyword.arg == "environment"
+        assert any(
+            keyword.arg is None
+            and isinstance(keyword.value, ast.Call)
+            and isinstance(keyword.value.func, ast.Attribute)
+            and keyword.value.func.attr == "_container_security_options"
+            for keyword in call.keywords
         )
-        assert isinstance(environment, ast.Dict)
-        environment_values = {
-            key.value: value.value
-            for key, value in zip(environment.keys, environment.values)
-            if isinstance(key, ast.Constant)
-            and isinstance(value, ast.Constant)
-        }
-        assert environment_values.get("PYTHONDONTWRITEBYTECODE") == "1"
-        assert "-p no:cacheprovider" in environment_values.get("PYTEST_ADDOPTS", "")
+    policy_path = Path(__file__).resolve().parents[1] / "core" / "sandbox_policy.py"
+    policy = policy_path.read_text(encoding="utf-8")
+    assert '"PYTHONDONTWRITEBYTECODE": "1"' in policy
+    assert '"PYTEST_ADDOPTS": "-p no:cacheprovider"' in policy
 
 
 def test_statistics_route_uses_sqlalchemy_func_not_session_func():
@@ -354,6 +371,6 @@ def test_statistics_route_uses_sqlalchemy_func_not_session_func():
 def test_sandbox_test_container_bootstraps_project_and_declared_test_dependencies():
     runner_path = Path(__file__).resolve().parents[1] / "core" / "docker_runner.py"
     source = runner_path.read_text(encoding="utf-8")
-    assert "python -m pip install -e ." in source
-    assert "python -m pip install --group tests" in source
-    assert "python -m pip install --disable-pip-version-check --upgrade pip" in source
+    assert "'--user', '.'" in source
+    assert "python -m pip install --user --group tests" in source
+    assert "python -m pip install --user --disable-pip-version-check --upgrade pip" in source
