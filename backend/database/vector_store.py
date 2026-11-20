@@ -4,7 +4,6 @@ from typing import List, Dict, Optional, Any
 import logging
 from sentence_transformers import SentenceTransformer
 import json
-import os
 from pathlib import Path
 from datetime import datetime
 
